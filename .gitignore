@@ -1,0 +1,43 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+._*
+.Spotlight-V100
+.Trashes
+
+# Swift & Xcode Build Artifacts
+.build/
+Packages/
+DerivedData/
+.swiftpm/
+xcuserdata/
+*.xcuserdatad/
+*.xcscmblueprint
+*.xccheckout
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Credentials and Secrets
+.netrc
+*.p12
+*.cer
+*.mobileprovision
+*.provisionprofile
+*.pem
+*.key
+
+# Swift Package Manager
+Package.resolved
+.swiftpm/configuration/registries.json
+.swiftpm/xcode/package.xcworkspace/contents.xcworkspacedata
+.netrc
+
+# Exclude documentation build artifacts
+/LocationTrackerPackage/docs/
+/docs/
