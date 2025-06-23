@@ -1,0 +1,38 @@
+name: Swift
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    name: Build and Test
+    runs-on: macos-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Swift
+      uses: swift-actions/setup-swift@v1
+      with:
+        swift-version: "5.9"
+
+    - name: Build Package
+      run: |
+        cd LocationTrackerPackage
+        swift build -v
+
+    - name: Run Tests
+      run: |
+        cd LocationTrackerPackage
+        swift test -v
+
+    - name: Verify Documentation
+      run: |
+        cd LocationTrackerPackage
+        if [ -f "./build-docs.sh" ]; then
+          chmod +x ./build-docs.sh
+          ./build-docs.sh
+        fi

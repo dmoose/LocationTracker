@@ -1,0 +1,11 @@
+version: 1
+builder:
+  configs:
+    - platform: ios
+      scheme: LocationTrackerPackage
+    - platform: macos
+      scheme: LocationTrackerPackage
+    - platform: watchos
+      scheme: LocationTrackerPackage
+    - platform: tvos
+      scheme: LocationTrackerPackage
