@@ -15,7 +15,7 @@ let package = Package(
         
         .watchOS(.v10),
         
-        .tvOS(.v17),
+
         
     ],
     products: [

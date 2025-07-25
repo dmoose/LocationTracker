@@ -10,39 +10,71 @@ import LocationTracker
 
 @main
 struct ConsoleDemo {
+    private let locationManager = LocationTracker.LocationManager()
+
     static func main() async {
-        print("=== LocationTracker Simple Console Demo ===\n")
-
-        print("This is a placeholder for a console demo of LocationTracker.")
-        print("Replace this with actual demonstrations of your package's functionality.")
-
-        // Example structure for a demo:
-        await runDemo()
-
+        print("=== LocationTracker Console Demo ===\n")
+        let demo = ConsoleDemo()
+        await demo.run()
         print("\nDemo completed!")
     }
 
-    static func runDemo() async {
-        // STEP 1: Initialize components from your package
-        print("\n1. Initializing LocationTracker components...")
-        // Initialize your package's main components here
-        // Example: let manager = LocationTracker.MainComponent()
+    func run() async {
+        // 1. Request permission and wait for authorization
+        print("1. Requesting location permission...")
+        locationManager.requestPermission()
+        print("   Please grant permission in the system dialog.")
 
-        // STEP 2: Demonstrate basic functionality
-        print("\n2. Demonstrating basic functionality...")
-        // Show the basic usage of your package
-        // Example: let result = await manager.performOperation()
+        while locationManager.authorizationStatus == .notDetermined {
+            try? await Task.sleep(for: .seconds(1))
+        }
 
-        // STEP 3: Demonstrate more advanced features
-        print("\n3. Demonstrating advanced features...")
-        // Show more advanced or specialized features
+        // 2. Check authorization status
+        print("\n2. Checking authorization status...")
+        guard locationManager.authorizationStatus == .authorizedWhenInUse || locationManager.authorizationStatus == .authorizedAlways else {
+            print("   Permission not granted. Status: \(authorizationStatusString(locationManager.authorizationStatus))")
+            return
+        }
+        print("   Permission granted: \(authorizationStatusString(locationManager.authorizationStatus))")
 
-        // STEP 4: Show error handling
-        print("\n4. Demonstrating error handling...")
-        // Demonstrate how errors are properly handled
+        // 3. Start location updates
+        print("\n3. Starting location updates for 15 seconds...")
+        locationManager.startUpdating()
 
-        // Add additional steps as needed to showcase your package's capabilities
+        let startTime = Date()
+        while Date().timeIntervalSince(startTime) < 15 {
+            if let location = locationManager.currentLocation {
+                print("   - Updated Location: Lat \(String(format: "%.4f", location.latitude)), Lon \(String(format: "%.4f", location.longitude))")
+            } else {
+                print("   - Waiting for initial location...")
+            }
+            try? await Task.sleep(for: .seconds(2))
+        }
+
+        // 4. Stop location updates
+        print("\n4. Stopping location updates...")
+        locationManager.stopUpdating()
+
+        // 5. Display location history
+        print("\n5. Displaying location history...")
+        let history = locationManager.getHistory()
+        if history.isEmpty {
+            print("   - No locations recorded.")
+        } else {
+            for (index, location) in history.enumerated() {
+                print("   - [\(index + 1)] Lat \(String(format: "%.4f", location.latitude)), Lon \(String(format: "%.4f", location.longitude)) at \(location.timestamp)")
+            }
+        }
+    }
+
+    private func authorizationStatusString(_ status: CLAuthorizationStatus) -> String {
+        switch status {
+        case .notDetermined: return "Not Determined"
+        case .restricted: return "Restricted"
+        case .denied: return "Denied"
+        case .authorizedAlways: return "Authorized Always"
+        case .authorizedWhenInUse: return "Authorized When In Use"
+        @unknown default: return "Unknown"
+        }
     }
 }
-
-// Add any helper functions or additional code needed for the demo

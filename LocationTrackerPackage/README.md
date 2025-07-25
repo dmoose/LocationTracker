@@ -1,32 +1,100 @@
 # LocationTracker
 
-**LocationTracker** is a lightweight Swift package designed to a Swift package for locationtracker. It provides an elegant abstraction layer over Swift's concurrency system, making it effortless to handle states, errors, and results while maintaining clean, reactive code.
+**LocationTracker** is a modern, lightweight Swift package designed to simplify location tracking in your iOS, macOS, and other Apple platform apps. It provides a clean, reactive, and easy-to-use wrapper around `CoreLocation`.
 
 ## Overview
 
-At its core, the package offers a simple yet powerful pattern for managing tasks through the `ObservableSingleTask` class. This class transparently handles the entire lifecycle of operations—from initiation and state tracking to error handling and cancellation—all while seamlessly integrating with SwiftUI through the modern `@Observable` macro.
+The package's core is the `LocationManager` class, which handles everything from requesting user permissions to delivering location updates. It's built with SwiftUI in mind, using the `@Observable` macro to ensure your UI updates in real-time with minimal effort.
 
 ### Perfect For
 
-LocationTracker is particularly valuable for iOS and macOS applications that need to:
+LocationTracker is ideal for any app that needs to:
 
-* Perform operations with proper loading indicators and error handling
-* Execute background processing tasks with cancellation support
-* Maintain responsive UIs during long-running operations
-* Implement clean architecture with clear separation between UI and logic
-* Handle complex error scenarios with custom error mapping
+*   Fetch the user's current location.
+*   Request and monitor location permissions.
+*   Receive continuous location updates.
+*   Optionally track location in the background.
+*   Keep a history of recorded locations.
 
 ### Key Features
 
-- **State Management:** Monitor task progress, results, and errors using reactive properties
-- **Task Cancellation:** Cancel running tasks to free up resources when no longer needed
-- **Customizable Error Handling:** Define custom error-handling logic tailored to your application
-- **Seamless SwiftUI Integration:** Uses the `@Observable` macro for real-time UI updates on iOS 17+ and macOS 14+
-- **`LocationTracker.ObservableSingleTask`:** A view model for managing a single cancellable task
+- **Simple API:** An intuitive and straightforward interface for location management.
+- **SwiftUI Integration:** Uses `@Observable` for seamless, real-time UI updates on modern Apple platforms (iOS 17+, macOS 14+).
+- **Permission Handling:** Simplifies the process of requesting and checking authorization status.
+- **Configurable Precision:** Easily set the desired accuracy for location updates.
+- **In-Memory History:** Keeps a simple, in-memory log of received locations.
+- **Background Updates:** Supports enabling background location tracking.
 
-## Documentation
+## Platform Setup
 
-This package uses GitHub Actions to automatically generate and publish documentation to GitHub Pages.
+To use this package, you must configure your app target with the correct permissions for each platform.
+
+### iOS
+
+In your app's `Info.plist` file, you must add entries for the location privacy descriptions. The system will show these strings to the user when requesting permission.
+
+1.  `Privacy - Location When In Use Usage Description`
+2.  `Privacy - Location Always and When In Use Usage Description` (if you plan to request "Always" access)
+
+### macOS
+
+If your macOS app uses the App Sandbox, you must enable the "Location" entitlement.
+
+1.  Go to your project's target settings.
+2.  Select the **Signing & Capabilities** tab.
+3.  If you are using the sandbox, find the **App Sandbox** section and check the box for **Location**.
+
+## Usage
+
+Using LocationTracker is simple. Here's a quick example of how to integrate it into a SwiftUI view.
+
+### 1. Add the Package
+
+Add this Swift package to your project as a local dependency.
+
+### 2. Add Privacy Usage Description
+
+In your app's `Info.plist`, you must add a key explaining why you need location access. Without this, permission requests will fail.
+
+-   **Key:** `Privacy - Location When In Use Usage Description`
+-   **Value:** `We need your location to show it on the map.`
+
+### 3. Use in SwiftUI
+
+Create an instance of `LocationManager` in your view and use its properties to drive your UI.
+
+```swift
+import SwiftUI
+import LocationTracker
+
+struct MyLocationView: View {
+    @State private var locationManager = LocationTracker.LocationManager()
+
+    var body: some View {
+        VStack(spacing: 15) {
+            if let location = locationManager.currentLocation {
+                Text("Lat: \(location.latitude), Lon: \(location.longitude)")
+            } else {
+                Text("Fetching location...")
+            }
+
+            Text("Status: \(String(describing: locationManager.authorizationStatus))")
+
+            Button("Request Permission") {
+                locationManager.requestPermission()
+            }
+
+            Button("Start Tracking") {
+                locationManager.startUpdating()
+            }
+        }
+        .onAppear {
+            // Optional: Automatically request permission when the view appears
+            locationManager.requestPermission()
+        }
+    }
+}
+```
 
 ## Demo Apps
 
