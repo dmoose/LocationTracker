@@ -6,12 +6,16 @@
 //
 
 import SwiftUI
+import LocationTracker
 
 @main
 struct LocationTrackerDemoApp: App {
+    @State private var locationManager = LocationTracker.LocationManager()
+
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .environment(locationManager)
         }
     }
 }

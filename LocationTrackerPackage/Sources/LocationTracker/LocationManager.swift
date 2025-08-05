@@ -7,72 +7,157 @@
 
 import Foundation
 import CoreLocation
-import Combine
+import Observation
 
 @available(iOS 17.0, macOS 14.0, tvOS 17.0, watchOS 10.0, *)
 extension LocationTracker {
+    public enum LocationError: Error, LocalizedError, Identifiable {
+        case authorizationDenied
+        case authorizationRestricted
+        case locationUnavailable
+        case unknown
+
+        public var id: String { localizedDescription }
+
+        public var errorDescription: String? {
+            switch self {
+            case .authorizationDenied:
+                return "Location access was denied by the user."
+            case .authorizationRestricted:
+                return "Location access is restricted and cannot be requested."
+            case .locationUnavailable:
+                return "Location information is currently unavailable."
+            case .unknown:
+                return "An unknown location error occurred."
+            }
+        }
+    }
 
     @Observable
     public class LocationManager: NSObject, CLLocationManagerDelegate {
-        private let manager = CLLocationManager()
+        private let locationManager = CLLocationManager()
         private let historyProvider: LocationHistoryProvider
 
-        public var currentLocation: Location?
-        public var authorizationStatus: CLAuthorizationStatus
+        @MainActor public private(set) var currentLocation: Location?
+        @MainActor public private(set) var authorizationStatus: CLAuthorizationStatus = .notDetermined
+        @MainActor public private(set) var lastError: LocationError?
 
-        public init(historyProvider: LocationHistoryProvider = .init()) {
+        private var locationContinuation: CheckedContinuation<Location, Error>?
+        private let continuationLock = NSLock()
+
+        public init(historyProvider: LocationHistoryProvider = .shared) {
             self.historyProvider = historyProvider
-            self.authorizationStatus = manager.authorizationStatus
             super.init()
-            manager.delegate = self
+            locationManager.delegate = self
+            // The initial value is .notDetermined, now fetch the real one.
+            Task { @MainActor in
+                self.authorizationStatus = CLLocationManager().authorizationStatus
+            }
         }
 
-        /// Requests location permission from the user.
-        /// This will request "When In Use" authorization.
+        @MainActor
         public func requestPermission() {
-            manager.requestWhenInUseAuthorization()
+            guard locationManager.authorizationStatus == .notDetermined else { return }
+            locationManager.requestWhenInUseAuthorization()
         }
 
-        /// Starts location updates with a given precision.
-        /// - Parameter precision: The desired location accuracy.
-        public func startUpdating(precision: CLLocationAccuracy = kCLLocationAccuracyNearestTenMeters) {
-            manager.desiredAccuracy = precision
-            manager.startUpdatingLocation()
+        public func startUpdatingLocation(accuracy: CLLocationAccuracy, distanceFilter: CLLocationDistance = kCLDistanceFilterNone) {
+            locationManager.desiredAccuracy = accuracy
+            locationManager.distanceFilter = distanceFilter
+            locationManager.startUpdatingLocation()
         }
 
-        /// Stops location updates.
-        public func stopUpdating() {
-            manager.stopUpdatingLocation()
-        }
-        
-        /// Allows or disallows background location updates.
-        /// - Parameter allows: A boolean indicating if background updates should be allowed.
-        public func setAllowsBackgroundUpdates(_ allows: Bool) {
-            manager.allowsBackgroundLocationUpdates = allows
+        public func stopUpdatingLocation() {
+            locationManager.stopUpdatingLocation()
         }
 
-        /// Retrieves the location history.
-        /// - Returns: An array of `Location` objects.
+        public func enableBackgroundUpdates(_ allows: Bool) {
+            locationManager.allowsBackgroundLocationUpdates = allows
+        }
+
+        @MainActor
         public func getHistory() -> [Location] {
-            return historyProvider.getHistory()
+            historyProvider.getHistory()
+        }
+
+        @MainActor
+        public func clearHistory() {
+            historyProvider.clearHistory()
+        }
+
+        public func getCurrentLocation() async throws -> Location {
+            let status = await authorizationStatus
+            guard status != .denied && status != .restricted else {
+                let error = LocationError.authorizationDenied
+                await MainActor.run { self.lastError = error }
+                throw error
+            }
+
+            return try await withCheckedThrowingContinuation { continuation in
+                continuationLock.withLock {
+                    self.locationContinuation = continuation
+                }
+                locationManager.requestLocation()
+            }
         }
 
         // MARK: - CLLocationManagerDelegate
 
-        public func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        nonisolated public func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
             guard let clLocation = locations.last else { return }
-            let location = Location(from: clLocation)
-            self.currentLocation = location
-            historyProvider.addLocation(location)
+            let newLocation = Location(from: clLocation)
+
+            Task { @MainActor in
+                self.currentLocation = newLocation
+                self.historyProvider.addLocation(newLocation)
+                self.lastError = nil
+            }
+
+            continuationLock.withLock {
+                if let continuation = self.locationContinuation {
+                    continuation.resume(returning: newLocation)
+                    self.locationContinuation = nil
+                }
+            }
         }
 
-        public func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
-            // Handle errors here, e.g., by logging them.
-            print("Location manager failed with error: \(error.localizedDescription)")
+        nonisolated public func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+            let locationError: LocationError
+            if let clError = error as? CLError, clError.code == .denied {
+                locationError = .authorizationDenied
+            } else {
+                locationError = .locationUnavailable
+            }
+
+            Task { @MainActor in
+                self.lastError = locationError
+            }
+
+            continuationLock.withLock {
+                if let continuation = self.locationContinuation {
+                    continuation.resume(throwing: locationError)
+                    self.locationContinuation = nil
+                }
+            }
         }
 
-        public func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
-            self.authorizationStatus = manager.authorizationStatus
+        nonisolated public func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
+            let newStatus = manager.authorizationStatus
+            Task { @MainActor in
+                self.authorizationStatus = newStatus
+                switch newStatus {
+                case .denied:
+                    self.lastError = .authorizationDenied
+                case .restricted:
+                    self.lastError = .authorizationRestricted
+                case .authorizedWhenInUse, .authorizedAlways:
+                    if self.lastError == .authorizationDenied || self.lastError == .authorizationRestricted {
+                        self.lastError = nil
+                    }
+                default:
+                    break
+                }
+            }
         }
     }
 }

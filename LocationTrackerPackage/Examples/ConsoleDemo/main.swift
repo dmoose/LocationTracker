@@ -6,75 +6,94 @@
 //
 
 import Foundation
+import CoreLocation
 import LocationTracker
 
 @main
 struct ConsoleDemo {
-    private let locationManager = LocationTracker.LocationManager()
-
     static func main() async {
-        print("=== LocationTracker Console Demo ===\n")
-        let demo = ConsoleDemo()
-        await demo.run()
-        print("\nDemo completed!")
-    }
+        print("Location Tracker Console Demo")
+        print("-----------------------------")
 
-    func run() async {
-        // 1. Request permission and wait for authorization
-        print("1. Requesting location permission...")
-        locationManager.requestPermission()
-        print("   Please grant permission in the system dialog.")
+        let locationManager = LocationTracker.LocationManager()
 
+        // 1. Request Permission
+        print("\nStep 1: Requesting location permission...")
+        await MainActor.run { locationManager.requestPermission() }
+
+        // Wait for the user to respond to the permission dialog
         while locationManager.authorizationStatus == .notDetermined {
+            print("Waiting for user to grant permission...")
             try? await Task.sleep(for: .seconds(1))
         }
 
-        // 2. Check authorization status
-        print("\n2. Checking authorization status...")
         guard locationManager.authorizationStatus == .authorizedWhenInUse || locationManager.authorizationStatus == .authorizedAlways else {
-            print("   Permission not granted. Status: \(authorizationStatusString(locationManager.authorizationStatus))")
+            print("\nPermission was not granted. Status: \(locationManager.authorizationStatus.name)")
+            if let error = locationManager.lastError {
+                print("Error: \(error.localizedDescription)")
+            }
             return
         }
-        print("   Permission granted: \(authorizationStatusString(locationManager.authorizationStatus))")
 
-        // 3. Start location updates
-        print("\n3. Starting location updates for 15 seconds...")
-        locationManager.startUpdating()
+        print("Permission granted!")
+
+        // 2. Get a single, one-shot location
+        print("\nStep 2: Getting a single location update...")
+        do {
+            let location = try await locationManager.getCurrentLocation()
+            print("✅ Success! Current location: Lat \(location.latitude), Lon \(location.longitude)")
+        } catch {
+            print("❌ Error getting single location: \(error.localizedDescription)")
+        }
+
+        // 3. Start continuous updates with configuration
+        print("\nStep 3: Starting continuous updates for 15 seconds...")
+        print("Configuration: Accuracy=100m, Distance Filter=50m")
+        locationManager.startUpdatingLocation(accuracy: kCLLocationAccuracyHundredMeters, distanceFilter: 50)
 
         let startTime = Date()
         while Date().timeIntervalSince(startTime) < 15 {
             if let location = locationManager.currentLocation {
-                print("   - Updated Location: Lat \(String(format: "%.4f", location.latitude)), Lon \(String(format: "%.4f", location.longitude))")
+                print("  - Updated location: Lat \(location.latitude), Lon \(location.longitude) at \(location.timestamp.formatted(date: .omitted, time: .standard))")
             } else {
-                print("   - Waiting for initial location...")
+                print("  - Waiting for initial location...")
             }
             try? await Task.sleep(for: .seconds(2))
         }
 
-        // 4. Stop location updates
-        print("\n4. Stopping location updates...")
-        locationManager.stopUpdating()
+        // 4. Stop updates and show history
+        print("\nStep 4: Stopping updates.")
+        locationManager.stopUpdatingLocation()
 
-        // 5. Display location history
-        print("\n5. Displaying location history...")
+        print("\nFinal Location History:")
         let history = locationManager.getHistory()
         if history.isEmpty {
-            print("   - No locations recorded.")
+            print("History is empty.")
         } else {
-            for (index, location) in history.enumerated() {
-                print("   - [\(index + 1)] Lat \(String(format: "%.4f", location.latitude)), Lon \(String(format: "%.4f", location.longitude)) at \(location.timestamp)")
+            for location in history {
+                print("  - [\(location.timestamp.formatted())] Lat: \(location.latitude), Lon: \(location.longitude)")
             }
         }
-    }
 
-    private func authorizationStatusString(_ status: CLAuthorizationStatus) -> String {
-        switch status {
+        // 5. Clear history
+        print("\nStep 5: Clearing history.")
+        locationManager.clearHistory()
+        print("History cleared. Count: \(locationManager.getHistory().count)")
+
+        print("\nDemo finished.")
+    }
+}
+
+extension CLAuthorizationStatus {
+    var name: String {
+        switch self {
         case .notDetermined: return "Not Determined"
         case .restricted: return "Restricted"
         case .denied: return "Denied"
         case .authorizedAlways: return "Authorized Always"
         case .authorizedWhenInUse: return "Authorized When In Use"
-        @unknown default: return "Unknown"
+        @unknown default:
+            return "Unknown"
         }
     }
 }

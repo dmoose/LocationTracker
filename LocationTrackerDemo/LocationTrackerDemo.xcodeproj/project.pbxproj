@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		1F781A372E0A0A3400AEFC98 /* LocationTracker in Frameworks */ = {isa = PBXBuildFile; productRef = 1F781A362E0A0A3400AEFC98 /* LocationTracker */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		1F781A092E0A052700AEFC98 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -52,6 +56,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				1F781A372E0A0A3400AEFC98 /* LocationTracker in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -78,6 +83,7 @@
 				1F7819FC2E0A052500AEFC98 /* LocationTrackerDemo */,
 				1F781A0B2E0A052700AEFC98 /* LocationTrackerDemoTests */,
 				1F781A152E0A052700AEFC98 /* LocationTrackerDemoUITests */,
+				1F781A352E0A0A3400AEFC98 /* Frameworks */,
 				1F7819FB2E0A052500AEFC98 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -90,6 +96,13 @@
 				1F781A122E0A052700AEFC98 /* LocationTrackerDemoUITests.xctest */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		1F781A352E0A0A3400AEFC98 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -112,6 +125,7 @@
 			);
 			name = LocationTrackerDemo;
 			packageProductDependencies = (
+				1F781A362E0A0A3400AEFC98 /* LocationTracker */,
 			);
 			productName = LocationTrackerDemo;
 			productReference = 1F7819FA2E0A052500AEFC98 /* LocationTrackerDemo.app */;
@@ -195,6 +209,9 @@
 			);
 			mainGroup = 1F7819F12E0A052500AEFC98;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				1F781A342E0A078D00AEFC98 /* XCLocalSwiftPackageReference "../LocationTrackerPackage" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 1F7819FB2E0A052500AEFC98 /* Products */;
 			projectDirPath = "";
@@ -397,6 +414,8 @@
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "App needs location";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "App needs location";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -406,7 +425,6 @@
 				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphoneos*]" = UIStatusBarStyleDefault;
 				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphonesimulator*]" = UIStatusBarStyleDefault;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
@@ -436,6 +454,8 @@
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "App needs location";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "App needs location";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -445,7 +465,6 @@
 				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphoneos*]" = UIStatusBarStyleDefault;
 				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphonesimulator*]" = UIStatusBarStyleDefault;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				IPHONEOS_DEPLOYMENT_TARGET = 18.5;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
@@ -593,6 +612,21 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		1F781A342E0A078D00AEFC98 /* XCLocalSwiftPackageReference "../LocationTrackerPackage" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../LocationTrackerPackage;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		1F781A362E0A0A3400AEFC98 /* LocationTracker */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 1F781A342E0A078D00AEFC98 /* XCLocalSwiftPackageReference "../LocationTrackerPackage" */;
+			productName = LocationTracker;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 1F7819F22E0A052500AEFC98 /* Project object */;
 }

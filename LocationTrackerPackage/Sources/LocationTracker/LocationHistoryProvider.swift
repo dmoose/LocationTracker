@@ -11,6 +11,8 @@ import Foundation
 extension LocationTracker {
     /// An in-memory provider for storing and retrieving location history.
     public class LocationHistoryProvider {
+        public static let shared = LocationHistoryProvider()
+
         private var history: [Location] = []
         private let queue = DispatchQueue(label: "com.locationtracker.history.queue")
 
@@ -29,6 +31,13 @@ extension LocationTracker {
         public func getHistory() -> [Location] {
             queue.sync {
                 self.history
+            }
+        }
+
+        /// Clears all locations from the history.
+        public func clearHistory() {
+            queue.async {
+                self.history.removeAll()
             }
         }
     }
