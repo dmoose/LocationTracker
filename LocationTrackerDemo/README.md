@@ -1,49 +1,35 @@
-# LocationTracker Demo Project
+# LocationTracker Demo
 
-This directory is intended to contain an Xcode project that demonstrates the LocationTracker Swift package.
+This Xcode project demonstrates the features of the `LocationTracker` Swift package.
 
-## Creating the Demo Project
+## Features
 
-1. Open Xcode and create a new project:
-   - Choose a suitable template (e.g., iOS App, macOS App)
-   - Name it "LocationTrackerDemo"
-   - Place it in this directory
+The demo app showcases the following functionality:
 
-2. Add the LocationTracker package as a dependency:
-   - In Xcode, go to File > Add Packages...
-   - Click "Add Local..."
-   - Navigate to and select the `LocationTrackerPackage` directory
-   - Click "Add Package"
+- **Requesting Permissions:** A button to trigger the OS-level location permission prompt.
+- **Single Location Update:** Get the user's current location once.
+- **Continuous Updates:** Start and stop a stream of location updates.
+- **Configuration:**
+    - **Accuracy:** Choose from different levels of location accuracy (e.g., Best, Ten Meters).
+    - **Distance Filter:** Set a minimum distance (in meters) the device must move before a new update is delivered.
+- **Location History:**
+    - View a list of all recorded locations from the current session.
+    - Display recent locations as annotations on an interactive map.
+    - Use a stepper to control how many recent points are shown on the map.
+- **Background Updates:** A toggle to enable location tracking while the app is in the background (requires a one-time project configuration).
 
-3. Implement demo functionality:
-   - Create example views that demonstrate different aspects of the package
-   - Include basic usage examples
-   - Show error handling and other advanced features
+## Setup for Background Updates
 
-## Suggested Structure
+To test the background location updates feature, you must enable the capability in the Xcode project:
 
-```swift
-// ContentView.swift
-import SwiftUI
-import location-tracker
+1. In the Xcode Project Navigator, select the **`LocationTrackerDemo`** project file.
+2. Select the **`LocationTrackerDemo`** target.
+3. Go to the **"Signing & Capabilities"** tab.
+4. Click the **"+ Capability"** button.
+5. Find and double-click **"Background Modes"** from the list that appears.
+6. In the new "Background Modes" section, check the box for **"Location updates"**.
 
-struct ContentView: View {
-    var body: some View {
-        NavigationSplitView {
-            List {
-                NavigationLink("Basic Example", destination: BasicExampleView())
-                NavigationLink("Error Handling", destination: ErrorHandlingView())
-                NavigationLink("Advanced Features", destination: AdvancedFeaturesView())
-            }
-            .navigationTitle("LocationTracker Demos")
-        } detail: {
-            Text("Select a demo from the sidebar")
-                .font(.title2)
-                .foregroundStyle(.secondary)
-        }
-    }
-}
-```
+Once enabled, you can use the "Allow Background Updates" toggle in the app.
 
 ## Requirements
 

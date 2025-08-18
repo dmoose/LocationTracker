@@ -39,6 +39,7 @@ struct ContentView: View {
 
     @State private var selectedAccuracy: Accuracy = .best
     @State private var distanceFilterString: String = ""
+    @State private var allowBackgroundUpdates: Bool = false
 
     var body: some View {
         NavigationStack {
@@ -119,32 +120,73 @@ struct ContentView: View {
             Divider()
 
             // Configuration Section
-            VStack {
-                Picker("Accuracy", selection: $selectedAccuracy) {
-                    ForEach(Accuracy.allCases) { accuracy in
-                        Text(accuracy.rawValue).tag(accuracy)
+            VStack(alignment: .leading, spacing: 12) {
+                // --- Accuracy Setting ---
+                VStack(alignment: .leading) {
+                    Text("1. Location Accuracy")
+                        .font(.subheadline).bold()
+                    Picker("Accuracy", selection: $selectedAccuracy) {
+                        ForEach(Accuracy.allCases) { accuracy in
+                            Text(accuracy.rawValue).tag(accuracy)
+                        }
                     }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    
+                    Text("Controls location precision. Higher accuracy uses more battery.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
-                .pickerStyle(.segmented)
-                .disabled(isUpdating)
-
-                HStack {
-                    Text("Distance Filter (meters):")
-                    TextField("Distance Filter (meters)", text: $distanceFilterString)
-                        .textFieldStyle(.roundedBorder)
-                        .frame(width: 80)
-                        .disabled(isUpdating)
+                
+                // --- Distance Filter Setting ---
+                VStack(alignment: .leading) {
+                    Text("2. Update Filter")
+                        .font(.subheadline).bold()
+                    HStack {
+                        Text("Minimum Distance (meters):")
+                        TextField("e.g. 100", text: $distanceFilterString)
+                            .textFieldStyle(.roundedBorder)
+                            .frame(maxWidth: 100)
+                            .keyboardType(.numberPad)
+                            .toolbar {
+                                ToolbarItemGroup(placement: .keyboard) {
+                                    Spacer()
+                                    Button("Done") {
+                                        // This tells the system to dismiss the keyboard
+                                        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                                    }
+                                }
+                            }
+                    }
+                    Text("Only get updates after moving this distance. Leave blank for all.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                
+                // --- Background Updates Setting ---
+                VStack(alignment: .leading) {
+                    Text("3. Background Updates")
+                        .font(.subheadline).bold()
+                    Toggle("Allow Background Updates", isOn: $allowBackgroundUpdates)
+                    Text("Requires enabling 'Location updates' in project capabilities.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
             }
             .padding()
             .background(platformAppropriateBackground.opacity(0.5))
-            .cornerRadius(8)
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .disabled(isUpdating)
 
             Button(isUpdating ? "Stop Continuous Updates" : "Start Continuous Updates") {
                 isUpdating.toggle()
                 if isUpdating {
                     let distance = Double(distanceFilterString) ?? kCLDistanceFilterNone
-                    locationManager.startUpdatingLocation(accuracy: selectedAccuracy.value, distanceFilter: distance)
+                    locationManager.startUpdatingLocation(
+                        accuracy: selectedAccuracy.value,
+                        distanceFilter: distance,
+                        allowsBackgroundUpdates: allowBackgroundUpdates
+                    )
                 } else {
                     locationManager.stopUpdatingLocation()
                 }

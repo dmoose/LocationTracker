@@ -61,9 +61,10 @@ extension LocationTracker {
             locationManager.requestWhenInUseAuthorization()
         }
 
-        public func startUpdatingLocation(accuracy: CLLocationAccuracy, distanceFilter: CLLocationDistance = kCLDistanceFilterNone) {
+        public func startUpdatingLocation(accuracy: CLLocationAccuracy, distanceFilter: CLLocationDistance = kCLDistanceFilterNone, allowsBackgroundUpdates: Bool = false) {
             locationManager.desiredAccuracy = accuracy
             locationManager.distanceFilter = distanceFilter
+            locationManager.allowsBackgroundLocationUpdates = allowsBackgroundUpdates
             locationManager.startUpdatingLocation()
         }
 
