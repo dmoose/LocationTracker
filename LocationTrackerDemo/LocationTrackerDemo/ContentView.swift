@@ -43,13 +43,14 @@ struct ContentView: View {
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 16) {
-                header
-                controls
-                status
-                Spacer()
+            ScrollView {
+                VStack(spacing: 16) {
+                    header
+                    controls
+                    status
+                }
+                .padding()
             }
-            .padding()
             .navigationTitle("Location Tracker")
             .toolbar {
                 #if os(iOS)
@@ -68,9 +69,9 @@ struct ContentView: View {
                 }
                 #endif
             }
-        }
-        .alert(isPresented: .constant(locationManager.lastError != nil), error: locationManager.lastError) {
-            // The default "OK" button is sufficient.
+            .alert(isPresented: .constant(locationManager.lastError != nil), error: locationManager.lastError) {
+                // The default "OK" button is sufficient.
+            }
         }
     }
 
@@ -99,10 +100,7 @@ struct ContentView: View {
 
     private var controls: some View {
         VStack(spacing: 12) {
-            Button("Request Permission") {
-                locationManager.requestPermission()
-            }
-            .buttonStyle(.borderedProminent)
+            permissionButton // A new computed property for the dynamic button
 
             Button("Get Current Location (One-Shot)") {
                 Task {
@@ -144,6 +142,7 @@ struct ContentView: View {
                         .font(.subheadline).bold()
                     HStack {
                         Text("Minimum Distance (meters):")
+                            .fixedSize(horizontal: false, vertical: true) // Allow text to wrap
                         TextField("e.g. 100", text: $distanceFilterString)
                             .textFieldStyle(.roundedBorder)
                             .frame(maxWidth: 100)
@@ -229,6 +228,30 @@ struct ContentView: View {
         Button("Clear History", systemImage: "trash") {
             locationManager.clearHistory()
         }
+    }
+
+    @ViewBuilder
+    private var permissionButton: some View {
+        let status = locationManager.authorizationStatus
+        let isDetermined = status != .notDetermined
+
+        Button(action: { locationManager.requestPermission() }) {
+            switch status {
+            case .notDetermined:
+                Text("Request Permission")
+            case .authorizedWhenInUse, .authorizedAlways:
+                Text("Permission Granted")
+            case .denied:
+                Text("Permission Denied")
+            case .restricted:
+                Text("Permission Restricted")
+            @unknown default:
+                Text("Unknown Status")
+            }
+        }
+        .buttonStyle(.borderedProminent)
+        .disabled(isDetermined)
+        .tint(status == .authorizedWhenInUse || status == .authorizedAlways ? .green : .accentColor)
     }
 
     private func statusText(for status: CLAuthorizationStatus) -> String {
