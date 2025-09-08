@@ -6,7 +6,7 @@
 //
 
 import SwiftUI
-import MapKit // Import MapKit
+import MapKit
 import LocationTracker
 
 struct HistoryView: View {
@@ -16,7 +16,6 @@ struct HistoryView: View {
 
     private var displayedLocations: [LocationTracker.Location] {
         let history = locationManager.getHistory()
-        // Ensure the number of points to show doesn't exceed available history
         let count = min(numberOfPointsToShow, history.count)
         return Array(history.suffix(count))
     }
@@ -29,7 +28,10 @@ struct HistoryView: View {
         }
         .navigationTitle("Location History")
         .onAppear(perform: updateMapPosition)
-        .onChange(of: displayedLocations) {
+        .onChange(of: displayedLocations) { // For stepper changes
+            updateMapPosition()
+        }
+        .onChange(of: locationManager.currentLocation) { // For live location updates
             updateMapPosition()
         }
     }
@@ -37,11 +39,26 @@ struct HistoryView: View {
     @ViewBuilder
     private var historyMap: some View {
         Map(position: $mapPosition) {
-            ForEach(displayedLocations) { location in
+            // Trail of previous locations as yellow dots
+            if displayedLocations.count > 1 {
+                ForEach(displayedLocations.dropLast()) { location in
+                    Annotation("", coordinate: CLLocationCoordinate2D(latitude: location.latitude, longitude: location.longitude)) {
+                        Circle()
+                            .fill(.yellow)
+                            .stroke(.orange, lineWidth: 1)
+                            .frame(width: 10, height: 10)
+                    }
+                }
+            }
+
+            // Marker for the most recent location
+            if let latestLocation = displayedLocations.last {
                 Marker(
-                    "\(location.timestamp, style: .time)",
-                    coordinate: CLLocationCoordinate2D(latitude: location.latitude, longitude: location.longitude)
+                    "Latest",
+                    systemImage: "figure.walk.circle.fill",
+                    coordinate: CLLocationCoordinate2D(latitude: latestLocation.latitude, longitude: latestLocation.longitude)
                 )
+                .tint(.blue)
             }
         }
         .mapStyle(.standard(elevation: .realistic))
