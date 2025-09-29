@@ -38,7 +38,7 @@ struct ContentView: View {
     }
 
     @State private var selectedAccuracy: Accuracy = .best
-    @State private var distanceFilterString: String = ""
+    @State private var distanceFilter: Double? = nil
     @State private var allowBackgroundUpdates: Bool = false
 
     var body: some View {
@@ -142,20 +142,21 @@ struct ContentView: View {
                         .font(.subheadline).bold()
                     HStack {
                         Text("Minimum Distance (meters):")
-                            .fixedSize(horizontal: false, vertical: true) // Allow text to wrap
-                        TextField("e.g. 100", text: $distanceFilterString)
+                            .fixedSize(horizontal: false, vertical: true)
+                        TextField("e.g. 100", value: $distanceFilter, format: .number)
                             .textFieldStyle(.roundedBorder)
                             .frame(maxWidth: 100)
+#if os(iOS)
                             .keyboardType(.numberPad)
                             .toolbar {
                                 ToolbarItemGroup(placement: .keyboard) {
                                     Spacer()
                                     Button("Done") {
-                                        // This tells the system to dismiss the keyboard
                                         UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
                                     }
                                 }
                             }
+#endif
                     }
                     Text("Only get updates after moving this distance. Leave blank for all.")
                         .font(.caption)
@@ -180,7 +181,7 @@ struct ContentView: View {
             Button(isUpdating ? "Stop Continuous Updates" : "Start Continuous Updates") {
                 isUpdating.toggle()
                 if isUpdating {
-                    let distance = Double(distanceFilterString) ?? kCLDistanceFilterNone
+                    let distance = distanceFilter ?? kCLDistanceFilterNone
                     locationManager.startUpdatingLocation(
                         accuracy: selectedAccuracy.value,
                         distanceFilter: distance,
@@ -239,29 +240,42 @@ struct ContentView: View {
             switch status {
             case .notDetermined:
                 Text("Request Permission")
+#if os(macOS)
+            case .authorized:
+                Text("Permission Granted")
+#else
             case .authorizedWhenInUse, .authorizedAlways:
                 Text("Permission Granted")
+#endif
             case .denied:
                 Text("Permission Denied")
             case .restricted:
                 Text("Permission Restricted")
-            @unknown default:
+            default:
                 Text("Unknown Status")
             }
         }
         .buttonStyle(.borderedProminent)
         .disabled(isDetermined)
+#if os(macOS)
+        .tint(status == .authorized ? .green : .accentColor)
+#else
         .tint(status == .authorizedWhenInUse || status == .authorizedAlways ? .green : .accentColor)
+#endif
     }
 
     private func statusText(for status: CLAuthorizationStatus) -> String {
         switch status {
         case .notDetermined: return "Not Determined"
-        case .restricted: return "Restricted"
-        case .denied: return "Denied"
-        case .authorizedAlways: return "Authorized Always"
+        case .restricted:    return "Restricted"
+        case .denied:        return "Denied"
+#if os(macOS)
+        case .authorized:    return "Authorized"
+#else
+        case .authorizedAlways:    return "Authorized Always"
         case .authorizedWhenInUse: return "Authorized When In Use"
-        @unknown default: return "Unknown"
+#endif
+        default:             return "Unknown"
         }
     }
 }
