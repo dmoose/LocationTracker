@@ -89,7 +89,7 @@ extension LocationTracker {
         public func getCurrentLocation() async throws -> Location {
             let status = await authorizationStatus
             guard status != .denied && status != .restricted else {
-                let error = LocationError.authorizationDenied
+                let error: LocationError = (status == .restricted) ? .authorizationRestricted : .authorizationDenied
                 await MainActor.run { self.lastError = error }
                 throw error
             }

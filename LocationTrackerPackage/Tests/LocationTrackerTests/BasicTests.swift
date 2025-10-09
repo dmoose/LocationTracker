@@ -6,7 +6,7 @@
 //
 
 import XCTest
-@testable import location-tracker
+@testable import LocationTracker
 
 final class LocationTrackerTests: XCTestCase {
 
