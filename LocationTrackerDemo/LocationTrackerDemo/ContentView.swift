@@ -41,6 +41,20 @@ struct ContentView: View {
     @State private var distanceFilter: Double? = nil
     @State private var allowBackgroundUpdates: Bool = false
 
+    // Phase 2: Power/Behavior
+    private enum Activity: String, CaseIterable, Identifiable {
+        case other = "Other"
+        case fitness = "Fitness"
+        case automotive = "Automotive"
+        case otherNavigation = "Navigation"
+        var id: Self { self }
+    }
+    @State private var selectedActivity: Activity = .other
+#if os(iOS)
+    @State private var pausesAutomatically: Bool = true
+    @State private var showsBGIndicator: Bool = false
+#endif
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -172,16 +186,40 @@ struct ContentView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
+
+                // --- Power & Behavior ---
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("4. Power & Behavior")
+                        .font(.subheadline).bold()
+                    // Activity type
+                    Picker("Activity", selection: $selectedActivity) {
+                        ForEach(Activity.allCases) { act in
+                            Text(act.rawValue).tag(act)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+#if os(iOS)
+                    Toggle("Pause Automatically", isOn: $pausesAutomatically)
+                    Toggle("Show Background Indicator", isOn: $showsBGIndicator)
+#endif
+                }
             }
             .padding()
             .background(platformAppropriateBackground.opacity(0.5))
             .clipShape(RoundedRectangle(cornerRadius: 10))
             .disabled(isUpdating)
+            .onChange(of: selectedActivity) { applyPowerBehavior() }
+            .onChange(of: allowBackgroundUpdates) { applyPowerBehavior() }
+#if os(iOS)
+            .onChange(of: pausesAutomatically) { applyPowerBehavior() }
+            .onChange(of: showsBGIndicator) { applyPowerBehavior() }
+#endif
 
             Button(isUpdating ? "Stop Continuous Updates" : "Start Continuous Updates") {
                 isUpdating.toggle()
                 if isUpdating {
                     let distance = distanceFilter ?? kCLDistanceFilterNone
+                    applyPowerBehavior() // apply before starting
                     locationManager.startUpdatingLocation(
                         accuracy: selectedAccuracy.value,
                         distanceFilter: distance,
@@ -261,6 +299,21 @@ struct ContentView: View {
         .tint(status == .authorized ? .green : .accentColor)
 #else
         .tint(status == .authorizedWhenInUse || status == .authorizedAlways ? .green : .accentColor)
+#endif
+}
+
+    private func applyPowerBehavior() {
+        // Map UI state -> manager settings
+        switch selectedActivity {
+        case .other:           locationManager.activityType = .other
+        case .fitness:         locationManager.activityType = .fitness
+        case .automotive:      locationManager.activityType = .automotiveNavigation
+        case .otherNavigation: locationManager.activityType = .otherNavigation
+        }
+        locationManager.enableBackgroundUpdates(allowBackgroundUpdates)
+#if os(iOS)
+        locationManager.pausesLocationUpdatesAutomatically = pausesAutomatically
+        locationManager.showsBackgroundLocationIndicator = showsBGIndicator
 #endif
     }
 

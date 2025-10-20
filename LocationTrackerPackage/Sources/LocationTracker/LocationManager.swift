@@ -72,8 +72,43 @@ extension LocationTracker {
             locationManager.stopUpdatingLocation()
         }
 
+        // MARK: - Power/Behavior Configuration
+
+        /// The type of user activity associated with the location updates.
+        /// Helps the system optimize power and accuracy trade-offs.
+        public var activityType: CLActivityType {
+            get { locationManager.activityType }
+            set { locationManager.activityType = newValue }
+        }
+
+        /// Whether the location manager may pause updates to save power.
+        /// iOS only.
+        #if os(iOS)
+        public var pausesLocationUpdatesAutomatically: Bool {
+            get { locationManager.pausesLocationUpdatesAutomatically }
+            set { locationManager.pausesLocationUpdatesAutomatically = newValue }
+        }
+
+        /// Whether to show the blue background location indicator when updating in the background.
+        public var showsBackgroundLocationIndicator: Bool {
+            get { locationManager.showsBackgroundLocationIndicator }
+            set { locationManager.showsBackgroundLocationIndicator = newValue }
+        }
+        #endif
+
         public func enableBackgroundUpdates(_ allows: Bool) {
             locationManager.allowsBackgroundLocationUpdates = allows
+        }
+
+        /// Start monitoring for significant changes in the user’s location.
+        /// This is a low-power alternative to continuous updates.
+        public func startSignificantChangeUpdates() {
+            locationManager.startMonitoringSignificantLocationChanges()
+        }
+
+        /// Stop monitoring significant changes.
+        public func stopSignificantChangeUpdates() {
+            locationManager.stopMonitoringSignificantLocationChanges()
         }
 
         @MainActor
