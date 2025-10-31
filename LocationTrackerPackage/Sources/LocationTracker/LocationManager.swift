@@ -102,13 +102,17 @@ extension LocationTracker {
 
         /// Start monitoring for significant changes in the user’s location.
         /// This is a low-power alternative to continuous updates.
+        @MainActor public private(set) var isMonitoringSignificantChanges: Bool = false
+
         public func startSignificantChangeUpdates() {
             locationManager.startMonitoringSignificantLocationChanges()
+            Task { @MainActor in self.isMonitoringSignificantChanges = true }
         }
 
         /// Stop monitoring significant changes.
         public func stopSignificantChangeUpdates() {
             locationManager.stopMonitoringSignificantLocationChanges()
+            Task { @MainActor in self.isMonitoringSignificantChanges = false }
         }
 
         @MainActor

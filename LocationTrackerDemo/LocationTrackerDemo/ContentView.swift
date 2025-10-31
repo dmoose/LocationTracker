@@ -49,7 +49,14 @@ struct ContentView: View {
         case otherNavigation = "Navigation"
         var id: Self { self }
     }
+    private enum UpdateMode: String, CaseIterable, Identifiable {
+        case continuous = "Continuous"
+        case significant = "Significant"
+        var id: Self { self }
+    }
+
     @State private var selectedActivity: Activity = .other
+    @State private var mode: UpdateMode = .continuous
 #if os(iOS)
     @State private var pausesAutomatically: Bool = true
     @State private var showsBGIndicator: Bool = false
@@ -133,9 +140,21 @@ struct ContentView: View {
 
             // Configuration Section
             VStack(alignment: .leading, spacing: 12) {
+                // --- Mode ---
+                VStack(alignment: .leading) {
+                    Text("1. Mode")
+                        .font(.subheadline).bold()
+                    Picker("Mode", selection: $mode) {
+                        ForEach(UpdateMode.allCases) { m in
+                            Text(m.rawValue).tag(m)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                }
+
                 // --- Accuracy Setting ---
                 VStack(alignment: .leading) {
-                    Text("1. Location Accuracy")
+                    Text("2. Location Accuracy")
                         .font(.subheadline).bold()
                     Picker("Accuracy", selection: $selectedAccuracy) {
                         ForEach(Accuracy.allCases) { accuracy in
@@ -144,6 +163,7 @@ struct ContentView: View {
                     }
                     .pickerStyle(.segmented)
                     .labelsHidden()
+                    .disabled(mode == .significant)
                     
                     Text("Controls location precision. Higher accuracy uses more battery.")
                         .font(.caption)
@@ -152,7 +172,7 @@ struct ContentView: View {
                 
                 // --- Distance Filter Setting ---
                 VStack(alignment: .leading) {
-                    Text("2. Update Filter")
+                    Text("3. Update Filter")
                         .font(.subheadline).bold()
                     HStack {
                         Text("Minimum Distance (meters):")
@@ -160,6 +180,7 @@ struct ContentView: View {
                         TextField("e.g. 100", value: $distanceFilter, format: .number)
                             .textFieldStyle(.roundedBorder)
                             .frame(maxWidth: 100)
+                            .disabled(mode == .significant)
 #if os(iOS)
                             .keyboardType(.numberPad)
                             .toolbar {
@@ -179,7 +200,7 @@ struct ContentView: View {
                 
                 // --- Background Updates Setting ---
                 VStack(alignment: .leading) {
-                    Text("3. Background Updates")
+                    Text("4. Background Updates")
                         .font(.subheadline).bold()
                     Toggle("Allow Background Updates", isOn: $allowBackgroundUpdates)
                     Text("Requires enabling 'Location updates' in project capabilities.")
@@ -210,6 +231,7 @@ struct ContentView: View {
             .disabled(isUpdating)
             .onChange(of: selectedActivity) { applyPowerBehavior() }
             .onChange(of: allowBackgroundUpdates) { applyPowerBehavior() }
+            .onChange(of: mode) { modeChanged() }
 #if os(iOS)
             .onChange(of: pausesAutomatically) { applyPowerBehavior() }
             .onChange(of: showsBGIndicator) { applyPowerBehavior() }
@@ -218,15 +240,10 @@ struct ContentView: View {
             Button(isUpdating ? "Stop Continuous Updates" : "Start Continuous Updates") {
                 isUpdating.toggle()
                 if isUpdating {
-                    let distance = distanceFilter ?? kCLDistanceFilterNone
                     applyPowerBehavior() // apply before starting
-                    locationManager.startUpdatingLocation(
-                        accuracy: selectedAccuracy.value,
-                        distanceFilter: distance,
-                        allowsBackgroundUpdates: allowBackgroundUpdates
-                    )
+                    startAccordingToMode()
                 } else {
-                    locationManager.stopUpdatingLocation()
+                    stopAccordingToMode()
                 }
             }
             .buttonStyle(.borderedProminent)
@@ -301,6 +318,37 @@ struct ContentView: View {
         .tint(status == .authorizedWhenInUse || status == .authorizedAlways ? .green : .accentColor)
 #endif
 }
+
+    private func modeChanged() {
+        if isUpdating {
+            // Restart with new mode
+            stopAccordingToMode()
+            startAccordingToMode()
+        }
+    }
+
+    private func startAccordingToMode() {
+        switch mode {
+        case .continuous:
+            let distance = distanceFilter ?? kCLDistanceFilterNone
+            locationManager.startUpdatingLocation(
+                accuracy: selectedAccuracy.value,
+                distanceFilter: distance,
+                allowsBackgroundUpdates: allowBackgroundUpdates
+            )
+        case .significant:
+            locationManager.startSignificantChangeUpdates()
+        }
+    }
+
+    private func stopAccordingToMode() {
+        switch mode {
+        case .continuous:
+            locationManager.stopUpdatingLocation()
+        case .significant:
+            locationManager.stopSignificantChangeUpdates()
+        }
+    }
 
     private func applyPowerBehavior() {
         // Map UI state -> manager settings
