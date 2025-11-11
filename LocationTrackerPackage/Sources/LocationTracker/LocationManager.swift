@@ -15,6 +15,8 @@ extension LocationTracker {
         case authorizationDenied
         case authorizationRestricted
         case locationUnavailable
+        case timeout
+        case alreadyInProgress
         case unknown
 
         public var id: String { localizedDescription }
@@ -27,6 +29,10 @@ extension LocationTracker {
                 return "Location access is restricted and cannot be requested."
             case .locationUnavailable:
                 return "Location information is currently unavailable."
+            case .timeout:
+                return "Timed out while trying to retrieve the current location."
+            case .alreadyInProgress:
+                return "A current location request is already in progress."
             case .unknown:
                 return "An unknown location error occurred."
             }
@@ -43,6 +49,9 @@ extension LocationTracker {
         @MainActor public private(set) var lastError: LocationError?
 
         private var locationContinuation: CheckedContinuation<Location, Error>?
+        private var pendingAccuracyThresholdMeters: CLLocationAccuracy?
+        private var pendingTimeoutTask: Task<Void, Never>?
+        private var isCurrentLocationRequestInProgress: Bool = false
         private let continuationLock = NSLock()
 
         public init(historyProvider: LocationHistoryProvider = .shared) {
@@ -125,17 +134,55 @@ extension LocationTracker {
             historyProvider.clearHistory()
         }
 
-        public func getCurrentLocation() async throws -> Location {
-            let status = await authorizationStatus
-            guard status != .denied && status != .restricted else {
+        public func getCurrentLocation(timeout: TimeInterval? = nil, accuracyThresholdMeters: CLLocationAccuracy? = nil) async throws -> Location {
+            // Read authorization directly from the underlying manager to avoid awaiting main actor
+            let status = locationManager.authorizationStatus
+            if status == .denied || status == .restricted {
                 let error: LocationError = (status == .restricted) ? .authorizationRestricted : .authorizationDenied
                 await MainActor.run { self.lastError = error }
                 throw error
             }
 
+            // Single-flight guard (atomic check-and-set) BEFORE any suspension
+            var shouldThrow = false
+            continuationLock.withLock {
+                if self.isCurrentLocationRequestInProgress || self.locationContinuation != nil {
+                    shouldThrow = true
+                } else {
+                    self.isCurrentLocationRequestInProgress = true
+                }
+            }
+            if shouldThrow {
+                throw LocationError.alreadyInProgress
+            }
+
             return try await withCheckedThrowingContinuation { continuation in
                 continuationLock.withLock {
                     self.locationContinuation = continuation
+                    self.pendingAccuracyThresholdMeters = accuracyThresholdMeters
+                    // Cancel any previous timeout task (defensive)
+                    self.pendingTimeoutTask?.cancel()
+                    if let seconds = timeout, seconds > 0 {
+                        let nanos = UInt64(seconds * 1_000_000_000)
+                        self.pendingTimeoutTask = Task { [weak self] in
+                            try? await Task.sleep(nanoseconds: nanos)
+                            guard let self = self else { return }
+                            self.continuationLock.withLock {
+                                if let cont = self.locationContinuation {
+                                    // Timeout still pending; fail
+                                    self.locationContinuation = nil
+                                    self.pendingAccuracyThresholdMeters = nil
+                                    let _ = self.pendingTimeoutTask?.cancel()
+                                    self.pendingTimeoutTask = nil
+                                    self.isCurrentLocationRequestInProgress = false
+                                    Task { @MainActor in self.lastError = .timeout }
+                                    cont.resume(throwing: LocationError.timeout)
+                                }
+                            }
+                        }
+                    } else {
+                        self.pendingTimeoutTask = nil
+                    }
                 }
                 locationManager.requestLocation()
             }
@@ -155,8 +202,20 @@ extension LocationTracker {
 
             continuationLock.withLock {
                 if let continuation = self.locationContinuation {
+                    // Check accuracy threshold if provided
+                    if let threshold = self.pendingAccuracyThresholdMeters {
+                        let acc = clLocation.horizontalAccuracy
+                        if acc < 0 || acc > threshold {
+                            // Not accurate enough yet; keep waiting
+                            return
+                        }
+                    }
                     continuation.resume(returning: newLocation)
                     self.locationContinuation = nil
+                    self.pendingAccuracyThresholdMeters = nil
+                    let _ = self.pendingTimeoutTask?.cancel()
+                    self.pendingTimeoutTask = nil
+                    self.isCurrentLocationRequestInProgress = false
                 }
             }
         }
@@ -177,6 +236,10 @@ extension LocationTracker {
                 if let continuation = self.locationContinuation {
                     continuation.resume(throwing: locationError)
                     self.locationContinuation = nil
+                    self.pendingAccuracyThresholdMeters = nil
+                    let _ = self.pendingTimeoutTask?.cancel()
+                    self.pendingTimeoutTask = nil
+                    self.isCurrentLocationRequestInProgress = false
                 }
             }
         }
