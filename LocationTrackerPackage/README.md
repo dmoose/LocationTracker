@@ -78,18 +78,21 @@ struct MyLocationView: View {
                 Text("Fetching location...")
             }
 
-            Text("Status: \(String(describing: locationManager.authorizationStatus))")
+            Text("Status: \(String(describing: locationManager.authorization))")
 
             Button("Request Permission") {
                 locationManager.requestPermission()
             }
 
             Button("Start Tracking") {
-                locationManager.startUpdating()
+                locationManager.startUpdatingLocation(
+                    accuracy: kCLLocationAccuracyBest,
+                    distanceFilter: kCLDistanceFilterNone,
+                    allowsBackgroundUpdates: false
+                )
             }
         }
         .onAppear {
-            // Optional: Automatically request permission when the view appears
             locationManager.requestPermission()
         }
     }

@@ -1,90 +1,82 @@
 # LocationTracker Quick Reference
 
-<!-- TODO: This is a placeholder file. See LLM_PROCESSING_INSTRUCTIONS.md for guidance on populating this file based on the actual source code implementation. -->
-
 ## Import
 
 ```swift
-import location-tracker
+import LocationTracker
 ```
 
 ## Key Types
 
-<!-- TODO: List main classes/structs with brief descriptions based on source code analysis -->
-
-### `[MainClassName]`
-[BRIEF DESCRIPTION - ANALYZE SOURCE CODE]
-
-### `[SecondaryType]`
-[BRIEF DESCRIPTION - ANALYZE SOURCE CODE]
+- LocationTracker.LocationManager (Observable)
+  - Entry point; wraps CLLocationManager
+- LocationTracker.Location (Codable, Identifiable)
+  - Captures latitude, longitude, timestamp
+- LocationTracker.LocationHistoryProvider
+  - In-memory history with optional retention
+- LocationTracker.Authorization
+  - Platform-agnostic authorization state
 
 ## Essential Methods
 
-<!-- TODO: List key methods with signatures based on source code analysis -->
-
 ```swift
-// TODO: Add actual method signatures from source code
-[MainClassName].[keyMethod]() -> [ReturnType]
-[MainClassName].[anotherMethod]([ParameterType]) throws -> [ReturnType]
+// Permissions
+LocationTracker.LocationManager.requestPermission()
+
+// One-shot location
+func getCurrentLocation(timeout: TimeInterval? = nil,
+                       accuracyThresholdMeters: CLLocationAccuracy? = nil) async throws -> LocationTracker.Location
+
+// Continuous updates
+func startUpdatingLocation(accuracy: CLLocationAccuracy,
+                           distanceFilter: CLLocationDistance = kCLDistanceFilterNone,
+                           allowsBackgroundUpdates: Bool = false)
+func stopUpdatingLocation()
+
+// Significant-change updates
+func startSignificantChangeUpdates()
+func stopSignificantChangeUpdates()
+
+// History
+func getHistory() -> [LocationTracker.Location]
+func clearHistory()
+
+// Power/behavior
+var activityType: CLActivityType { get set }
+#if os(iOS)
+var pausesLocationUpdatesAutomatically: Bool { get set }
+var showsBackgroundLocationIndicator: Bool { get set }
+#endif
 ```
 
 ## Common Patterns
 
-<!-- TODO: Show typical usage patterns based on source code analysis -->
-
-### Basic Initialization
 ```swift
-// TODO: Add actual initialization pattern
-let instance = [MainClassName]()
-```
+// One-shot with timeout
+let loc = try await manager.getCurrentLocation(timeout: 5)
 
-### Typical Usage
-```swift
-// TODO: Add common usage pattern from source code
-```
+// Continuous with distance filter
+manager.startUpdatingLocation(accuracy: kCLLocationAccuracyNearestTenMeters,
+                              distanceFilter: 10,
+                              allowsBackgroundUpdates: false)
 
-### Error Handling
-```swift
-// TODO: Add actual error handling pattern
-do {
-    try [operation]
-} catch [ErrorType].[case] {
-    // Handle error
-}
+// Significant-change (low power)
+manager.startSignificantChangeUpdates()
 ```
 
 ## Error Types
 
-<!-- TODO: List custom error types based on source code analysis -->
-
 ```swift
-enum [PackageErrorType]: Error {
-    // TODO: Add actual error cases from source code
-    case [errorCase1]
-    case [errorCase2]
+enum LocationTracker.LocationError: Error {
+    case authorizationDenied
+    case authorizationRestricted
+    case locationUnavailable
+    case timeout
+    case alreadyInProgress
+    case unknown
 }
 ```
 
 ## Platform Requirements
-
-<!-- TODO: Update based on Package.swift analysis -->
-- **iOS**: [VERSION]+
-- **macOS**: [VERSION]+
-- **watchOS**: [VERSION]+
-- **tvOS**: [VERSION]+
-- **Swift**: [VERSION]+
-
-## Quick Examples
-
-<!-- TODO: Add concise, copy-paste ready examples based on source code -->
-
-```swift
-// Basic usage
-import location-tracker
-
-// TODO: Add actual quick example
-```
-
-## Notes
-
-This reference card should be updated after implementing the actual package functionality. See `LLM_PROCESSING_INSTRUCTIONS.md` for detailed guidance on generating this content from source code analysis.
+- iOS 17+, macOS 14+, watchOS 10+, tvOS 17+
+- Swift 5.9+

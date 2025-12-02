@@ -62,6 +62,9 @@ struct ContentView: View {
     @State private var showsBGIndicator: Bool = false
 #endif
 
+    // Reverse geocoding demo output
+    @State private var reverseStatus: String = ""
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -248,6 +251,36 @@ struct ContentView: View {
             }
             .buttonStyle(.borderedProminent)
             .tint(isUpdating ? .red : .blue)
+
+            Divider()
+
+            Button("Reverse Geocode Current") {
+                Task {
+                    if let loc = locationManager.currentLocation {
+                        reverseStatus = "Looking up…"
+                        do {
+                            if let placemark = try await LocationTracker.Geocoder.reverse(location: loc) {
+                                reverseStatus = LocationTracker.Geocoder.format(placemark: placemark)
+                            } else {
+                                reverseStatus = "No placemark found"
+                            }
+                        } catch {
+                            reverseStatus = "Reverse geocode failed: \(error.localizedDescription)"
+                        }
+                    } else {
+                        reverseStatus = "No current location"
+                    }
+                }
+            }
+            .buttonStyle(.bordered)
+
+            if !reverseStatus.isEmpty {
+                Text(reverseStatus)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.leading)
+                    .lineLimit(3)
+            }
         }
     }
 
@@ -256,7 +289,7 @@ struct ContentView: View {
              HStack {
                 Text("Status:")
                     .bold()
-                Text(statusText(for: locationManager.authorizationStatus))
+                Text(statusText(for: locationManager.authorization))
                     .font(.system(.body, design: .monospaced))
             }
             if let location = locationManager.currentLocation {
@@ -288,35 +321,24 @@ struct ContentView: View {
 
     @ViewBuilder
     private var permissionButton: some View {
-        let status = locationManager.authorizationStatus
-        let isDetermined = status != .notDetermined
+        let auth = locationManager.authorization
+        let isDetermined = auth != .notDetermined
 
         Button(action: { locationManager.requestPermission() }) {
-            switch status {
+            switch auth {
             case .notDetermined:
                 Text("Request Permission")
-#if os(macOS)
-            case .authorized:
+            case .authorized, .authorizedWhenInUse, .authorizedAlways:
                 Text("Permission Granted")
-#else
-            case .authorizedWhenInUse, .authorizedAlways:
-                Text("Permission Granted")
-#endif
             case .denied:
                 Text("Permission Denied")
             case .restricted:
                 Text("Permission Restricted")
-            default:
-                Text("Unknown Status")
             }
         }
         .buttonStyle(.borderedProminent)
         .disabled(isDetermined)
-#if os(macOS)
-        .tint(status == .authorized ? .green : .accentColor)
-#else
-        .tint(status == .authorizedWhenInUse || status == .authorizedAlways ? .green : .accentColor)
-#endif
+        .tint((auth == .authorized || auth == .authorizedWhenInUse || auth == .authorizedAlways) ? .green : .accentColor)
 }
 
     private func modeChanged() {
@@ -365,18 +387,14 @@ struct ContentView: View {
 #endif
     }
 
-    private func statusText(for status: CLAuthorizationStatus) -> String {
-        switch status {
-        case .notDetermined: return "Not Determined"
-        case .restricted:    return "Restricted"
-        case .denied:        return "Denied"
-#if os(macOS)
-        case .authorized:    return "Authorized"
-#else
-        case .authorizedAlways:    return "Authorized Always"
-        case .authorizedWhenInUse: return "Authorized When In Use"
-#endif
-        default:             return "Unknown"
+    private func statusText(for auth: LocationTracker.Authorization) -> String {
+        switch auth {
+        case .notDetermined:        return "Not Determined"
+        case .restricted:           return "Restricted"
+        case .denied:               return "Denied"
+        case .authorized:           return "Authorized"
+        case .authorizedAlways:     return "Authorized Always"
+        case .authorizedWhenInUse:  return "Authorized When In Use"
         }
     }
 }

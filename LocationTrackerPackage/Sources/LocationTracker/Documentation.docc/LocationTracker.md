@@ -1,39 +1,51 @@
-# ``location-tracker``
+# ``LocationTracker``
 
-A Swift package for a Swift package for locationtracker.
+A modern, SwiftUI-friendly wrapper around Core Location for Apple platforms.
 
 ## Overview
 
-LocationTracker is a Swift package that provides [describe the main functionality and purpose of your package here]. It is designed to [explain the problem your package solves and its key benefits].
+LocationTracker provides a simple, observable API for requesting permissions, fetching a one-shot current location, and subscribing to continuous or significant-change updates. It includes a lightweight in-memory history and cross-platform authorization normalization.
 
 ### Key Features
 
-- **Feature 1**: Description of first key feature
-- **Feature 2**: Description of second key feature
-- **Feature 3**: Description of third key feature
+- Simple async getCurrentLocation(timeout:accuracyThresholdMeters:)
+- Continuous updates with desired accuracy, distance filter, and power controls
+- Significant-change monitoring (low-power alternative)
+- In-memory history with optional retention (max entries, max age)
+- Platform-agnostic authorization enum
 
 ## Getting Started
 
 ### Installation
 
-#### Swift Package Manager
-
-Add the following dependency to your `Package.swift` file:
-
-```swift
-.package(url: "https://github.com/yourusername/LocationTracker.git", from: "1.0.0")
-```
-
-Or in Xcode, go to File > Add Packages... and enter the repository URL.
+Use Swift Package Manager from Xcode (File > Add Packages…) or add to Package.swift.
 
 ### Basic Usage
 
 ```swift
-import location-tracker
+import LocationTracker
 
-// Basic usage example goes here
-let instance = LocationTracker.YourType()
-let result = instance.yourMethod()
+@State private var manager = LocationTracker.LocationManager()
+
+// Request permission
+manager.requestPermission()
+
+// One-shot location (with timeout)
+Task {
+    do {
+        let loc = try await manager.getCurrentLocation(timeout: 5)
+        print(loc)
+    } catch {
+        print("Failed:", error)
+    }
+}
+
+// Continuous updates
+manager.startUpdatingLocation(
+    accuracy: kCLLocationAccuracyBest,
+    distanceFilter: kCLDistanceFilterNone,
+    allowsBackgroundUpdates: false
+)
 ```
 
 ## Topics
@@ -42,19 +54,14 @@ let result = instance.yourMethod()
 
 - <doc:GettingStarted>
 - ``LocationTracker``
-
-### Main Components
-
-- Replace with links to your main types and protocols
-
-### Advanced Usage
-
-- Replace with links to advanced usage documentation
+- ``LocationTracker/LocationManager``
+- ``LocationTracker/Location``
+- ``LocationTracker/LocationHistoryProvider``
 
 ## Requirements
 
-- iOS 17.0+, macOS 14.0+, tvOS 17.0+, watchOS 10.0+
-- Swift 5.9+
+iOS 17.0+, macOS 14.0+, tvOS 17.0+, watchOS 10.0+
+Swift 5.9+
 
 ## License
 

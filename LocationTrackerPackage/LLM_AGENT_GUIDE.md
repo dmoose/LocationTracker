@@ -1,70 +1,82 @@
 # LocationTracker Package: LLM Integration Guide
 
-<!-- TODO: This is a placeholder file. See LLM_PROCESSING_INSTRUCTIONS.md for guidance on populating this file based on the actual source code implementation. -->
-
 ## Package Overview
 
-LocationTracker is a Swift package that [DESCRIBE FUNCTIONALITY BASED ON SOURCE CODE ANALYSIS].
+A minimal, modern wrapper around Core Location for Apple platforms, designed for SwiftUI. It provides a single observable manager, a simple value type for locations, cross-platform authorization normalization, and utilities for history and reverse geocoding.
 
-- **Platform Requirements**: [UPDATE BASED ON Package.swift]
-- **Swift Version**: [UPDATE BASED ON swift-tools-version]  
-- **Package Name**: `location-tracker`
+- **Platform Requirements**: iOS 17+, macOS 14+, watchOS 10+, tvOS 17+
+- **Swift Version**: 5.9+
+- **Product Name**: `LocationTracker`
 
 ## Core Components
 
-<!-- TODO: Analyze Sources/location-tracker/ and document main types here -->
+### LocationTracker.LocationManager (@Observable)
+- Permissions: `requestPermission()`
+- One-shot: `getCurrentLocation(timeout:accuracyThresholdMeters:)`
+- Continuous: `startUpdatingLocation(accuracy:distanceFilter:allowsBackgroundUpdates:)`, `stopUpdatingLocation()`
+- Significant Change: `startSignificantChangeUpdates()`, `stopSignificantChangeUpdates()`
+- Power: `activityType`, `pausesLocationUpdatesAutomatically` (iOS), `showsBackgroundLocationIndicator` (iOS)
+- State: `currentLocation`, `authorization`, `lastError`, `isMonitoringSignificantChanges`
 
-### `[MainClassName]`
+### LocationTracker.Location (Codable, Identifiable)
+- `latitude`, `longitude`, `timestamp`
 
-[DOCUMENT PRIMARY CLASS/STRUCT WITH USAGE EXAMPLES]
+### LocationTracker.LocationHistoryProvider
+- `addLocation`, `getHistory`, `clearHistory`
+- Retention: `maxEntries`, `maxAge`
 
-```swift
-import location-tracker
+### LocationTracker.Authorization
+- `.notDetermined`, `.restricted`, `.denied`, `.authorizedWhenInUse`, `.authorizedAlways`, `.authorized`
 
-// TODO: Add actual usage example based on source code
-let example = [MainClassName]()
-```
+### LocationTracker.Geocoder (optional helper)
+- `reverse(location:preferredLocale:)` (async) -> `CLPlacemark?`
+- `format(placemark:)` -> `String`
 
 ## Usage Examples
 
-<!-- TODO: Extract patterns from Tests/ and Examples/ directories -->
-
 ```swift
-import location-tracker
+import LocationTracker
 
-// TODO: Show common integration patterns
+@State private var manager = LocationTracker.LocationManager()
+
+// Request permission
+manager.requestPermission()
+
+// One-shot with timeout
+Task {
+    let loc = try? await manager.getCurrentLocation(timeout: 5)
+}
+
+// Continuous updates
+manager.startUpdatingLocation(accuracy: kCLLocationAccuracyNearestTenMeters, distanceFilter: 10)
+
+// Significant change (low power)
+manager.startSignificantChangeUpdates()
 ```
 
 ## Error Handling
 
-<!-- TODO: Document actual error types and handling patterns -->
-
 ```swift
+import LocationTracker
+
 do {
-    // TODO: Add actual error handling examples
-} catch [YourPackageError].[specificError] {
-    // Handle specific error
+    _ = try await manager.getCurrentLocation(timeout: 5)
+} catch let e as LocationTracker.LocationError {
+    switch e {
+    case .authorizationDenied, .authorizationRestricted:
+        // Prompt user to adjust settings
+        break
+    case .timeout:
+        // Inform user to try again or check connectivity
+        break
+    default:
+        break
+    }
 }
 ```
 
-## Integration Patterns
-
-<!-- TODO: Document common usage scenarios based on source code -->
-
-### Basic Usage
-[DOCUMENT BASIC INTEGRATION PATTERN]
-
-### Advanced Usage
-[DOCUMENT ADVANCED INTEGRATION PATTERNS]
-
 ## Best Practices
-
-<!-- TODO: Add recommendations based on actual implementation -->
-
-- [PRACTICE 1 BASED ON SOURCE CODE]
-- [PRACTICE 2 BASED ON SOURCE CODE]
-- [PRACTICE 3 BASED ON SOURCE CODE]
-
-## Notes
-
-This documentation should be updated after implementing the actual package functionality. See `LLM_PROCESSING_INSTRUCTIONS.md` for detailed guidance on how to generate this content from source code.
+- Keep continuous accuracy as low as acceptable for battery life.
+- Prefer significant-change mode for background or coarse tracking.
+- Use a small timeout for getCurrentLocation in UI flows to avoid hanging spinners.
+- Cap history with `maxEntries` and/or `maxAge` to avoid unbounded growth.

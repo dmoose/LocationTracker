@@ -31,7 +31,7 @@ echo -e "${GREEN}Building documentation for hosting...${NC}"
 swift package \
   --allow-writing-to-directory ./docs \
   generate-documentation \
-  --target location-tracker \
+  --target LocationTracker \
   --disable-indexing \
   --transform-for-static-hosting \
   --hosting-base-path "/" \
@@ -82,7 +82,7 @@ case "$1" in
 
     # Try official DocC preview first
     echo -e "${GREEN}Attempting to use DocC preview...${NC}"
-    if swift package --disable-sandbox preview-documentation --target location-tracker; then
+if swift package --disable-sandbox preview-documentation --target LocationTracker; then
       echo -e "${GREEN}DocC preview launched successfully${NC}"
     else
       echo -e "${YELLOW}DocC preview failed, falling back to Python HTTP server...${NC}"

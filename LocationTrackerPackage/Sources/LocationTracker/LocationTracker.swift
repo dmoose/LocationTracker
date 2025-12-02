@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import CoreLocation
 
 /// A namespace for organizing types and functionality related to LocationTracker.
 ///
@@ -33,3 +34,42 @@ import Foundation
 /// Replace this comment with actual documentation as you implement the package.
 @available(iOS 17.0, macOS 14.0, tvOS 17.0, watchOS 10.0, *)
 public enum LocationTracker {}
+
+@available(iOS 17.0, macOS 14.0, tvOS 17.0, watchOS 10.0, *)
+extension LocationTracker {
+    /// Platform-agnostic authorization state.
+    public enum Authorization: Equatable {
+        case notDetermined
+        case restricted
+        case denied
+        case authorizedWhenInUse
+        case authorizedAlways
+        case authorized // macOS unified authorized
+    }
+}
+
+@available(iOS 17.0, macOS 14.0, tvOS 17.0, watchOS 10.0, *)
+extension LocationTracker.Authorization {
+    #if os(macOS)
+    public init(_ status: CLAuthorizationStatus) {
+        switch status {
+        case .notDetermined: self = .notDetermined
+        case .restricted:    self = .restricted
+        case .denied:        self = .denied
+        case .authorized:    self = .authorized
+        default:             self = .notDetermined
+        }
+    }
+    #else
+    public init(_ status: CLAuthorizationStatus) {
+        switch status {
+        case .notDetermined:         self = .notDetermined
+        case .restricted:            self = .restricted
+        case .denied:                self = .denied
+        case .authorizedWhenInUse:   self = .authorizedWhenInUse
+        case .authorizedAlways:      self = .authorizedAlways
+        default:                     self = .notDetermined
+        }
+    }
+    #endif
+}

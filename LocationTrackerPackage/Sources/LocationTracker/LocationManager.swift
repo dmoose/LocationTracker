@@ -46,6 +46,7 @@ extension LocationTracker {
 
         @MainActor public private(set) var currentLocation: Location?
         @MainActor public private(set) var authorizationStatus: CLAuthorizationStatus = .notDetermined
+        @MainActor public var authorization: LocationTracker.Authorization { .init(authorizationStatus) }
         @MainActor public private(set) var lastError: LocationError?
 
         private var locationContinuation: CheckedContinuation<Location, Error>?

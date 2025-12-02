@@ -20,7 +20,7 @@ Then add the product to your target's dependencies:
 .target(
     name: "YourTarget",
     dependencies: [
-        .product(name: "location-tracker", package: "LocationTracker")
+        .product(name: "LocationTracker", package: "LocationTracker")
     ]
 )
 ```
@@ -39,7 +39,7 @@ If you're using Xcode:
 First, import the package:
 
 ```swift
-import location-tracker
+import LocationTracker
 ```
 
 Then you can use the main components of the package:
