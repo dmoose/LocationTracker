@@ -168,17 +168,21 @@ extension LocationTracker {
                         self.pendingTimeoutTask = Task { [weak self] in
                             try? await Task.sleep(nanoseconds: nanos)
                             guard let self = self else { return }
+                            var contToResume: CheckedContinuation<Location, Error>? = nil
                             self.continuationLock.withLock {
                                 if let cont = self.locationContinuation {
-                                    // Timeout still pending; fail
+                                    // Timeout still pending; capture and clear
+                                    contToResume = cont
                                     self.locationContinuation = nil
                                     self.pendingAccuracyThresholdMeters = nil
                                     let _ = self.pendingTimeoutTask?.cancel()
                                     self.pendingTimeoutTask = nil
                                     self.isCurrentLocationRequestInProgress = false
-                                    Task { @MainActor in self.lastError = .timeout }
-                                    cont.resume(throwing: LocationError.timeout)
                                 }
+                            }
+                            if let cont = contToResume {
+                                Task { @MainActor in self.lastError = .timeout }
+                                cont.resume(throwing: LocationError.timeout)
                             }
                         }
                     } else {
@@ -201,6 +205,7 @@ extension LocationTracker {
                 self.lastError = nil
             }
 
+            var contToResume: CheckedContinuation<Location, Error>? = nil
             continuationLock.withLock {
                 if let continuation = self.locationContinuation {
                     // Check accuracy threshold if provided
@@ -211,13 +216,16 @@ extension LocationTracker {
                             return
                         }
                     }
-                    continuation.resume(returning: newLocation)
+                    contToResume = continuation
                     self.locationContinuation = nil
                     self.pendingAccuracyThresholdMeters = nil
                     let _ = self.pendingTimeoutTask?.cancel()
                     self.pendingTimeoutTask = nil
                     self.isCurrentLocationRequestInProgress = false
                 }
+            }
+            if let cont = contToResume {
+                cont.resume(returning: newLocation)
             }
         }
 
@@ -233,15 +241,19 @@ extension LocationTracker {
                 self.lastError = locationError
             }
 
+            var contToResume: CheckedContinuation<Location, Error>? = nil
             continuationLock.withLock {
                 if let continuation = self.locationContinuation {
-                    continuation.resume(throwing: locationError)
+                    contToResume = continuation
                     self.locationContinuation = nil
                     self.pendingAccuracyThresholdMeters = nil
                     let _ = self.pendingTimeoutTask?.cancel()
                     self.pendingTimeoutTask = nil
                     self.isCurrentLocationRequestInProgress = false
                 }
+            }
+            if let cont = contToResume {
+                cont.resume(throwing: locationError)
             }
         }
 
