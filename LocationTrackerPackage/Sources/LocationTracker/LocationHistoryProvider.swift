@@ -21,14 +21,20 @@ extension LocationTracker {
         private var _maxAge: TimeInterval? = nil
 
         /// Maximum number of entries to retain. Oldest entries are trimmed first.
-        /// Set to nil (default) for no limit.
+        /// Set to `nil` (default) for no limit.
+        ///
+        /// Trimming occurs after appends and also when reading history, ensuring the returned
+        /// snapshot respects the current limit without requiring a manual cleanup call.
         public var maxEntries: Int? {
             get { queue.sync { _maxEntries } }
             set { queue.async { self._maxEntries = newValue; self.trimIfNeeded_locked(now: Date()) } }
         }
 
         /// Maximum age (in seconds) to retain entries. Older entries are dropped.
-        /// Set to nil (default) for no limit.
+        /// Set to `nil` (default) for no limit.
+        ///
+        /// Age-based trimming uses each entry's `timestamp` and applies both after appends and on read.
+        /// Combined with `maxEntries`, the final history contains only recent items within both limits.
         public var maxAge: TimeInterval? {
             get { queue.sync { _maxAge } }
             set { queue.async { self._maxAge = newValue; self.trimIfNeeded_locked(now: Date()) } }

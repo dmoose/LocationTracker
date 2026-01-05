@@ -57,6 +57,10 @@ manager.startUpdatingLocation(
 - ``LocationTracker/LocationManager``
 - ``LocationTracker/Location``
 - ``LocationTracker/LocationHistoryProvider``
+- ``LocationTracker/Geocoder``
+
+### Utilities
+- <doc:ReverseGeocoding>
 
 ## Requirements
 

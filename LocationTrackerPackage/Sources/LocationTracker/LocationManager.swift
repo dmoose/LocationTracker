@@ -86,6 +86,8 @@ extension LocationTracker {
 
         /// The type of user activity associated with the location updates.
         /// Helps the system optimize power and accuracy trade-offs.
+        /// The type of user activity associated with the location updates. Use this to hint the
+        /// system for better power/accuracy trade-offs (e.g., `.fitness`, `.automotiveNavigation`).
         public var activityType: CLActivityType {
             get { locationManager.activityType }
             set { locationManager.activityType = newValue }
@@ -94,12 +96,15 @@ extension LocationTracker {
         /// Whether the location manager may pause updates to save power.
         /// iOS only.
         #if os(iOS)
+        /// Whether the system may pause updates to save power when appropriate. Defaults to `true`.
         public var pausesLocationUpdatesAutomatically: Bool {
             get { locationManager.pausesLocationUpdatesAutomatically }
             set { locationManager.pausesLocationUpdatesAutomatically = newValue }
         }
 
         /// Whether to show the blue background location indicator when updating in the background.
+        /// Whether to show the blue background location indicator when updating in the background.
+        /// Displaying this indicator can improve user trust when background updates are enabled.
         public var showsBackgroundLocationIndicator: Bool {
             get { locationManager.showsBackgroundLocationIndicator }
             set { locationManager.showsBackgroundLocationIndicator = newValue }
@@ -112,6 +117,7 @@ extension LocationTracker {
 
         /// Start monitoring for significant changes in the user’s location.
         /// This is a low-power alternative to continuous updates.
+        /// True while monitoring significant-change updates. Updated on the main actor.
         @MainActor public private(set) var isMonitoringSignificantChanges: Bool = false
 
         public func startSignificantChangeUpdates() {
@@ -135,6 +141,16 @@ extension LocationTracker {
             historyProvider.clearHistory()
         }
 
+        /// Returns a single current location result.
+        /// - Parameters:
+        ///   - timeout: Seconds to wait before failing with `LocationError.timeout`. Pass `nil` to wait indefinitely.
+        ///   - accuracyThresholdMeters: If provided, the result only resolves when the `horizontalAccuracy` of a fix is less-than-or-equal to this value. Fixes with negative accuracy are ignored. If `nil`, the first fix returned by Core Location is used.
+        /// - Throws: `LocationError.authorizationDenied`, `LocationError.authorizationRestricted`, `LocationError.alreadyInProgress`, `LocationError.timeout`, or `LocationError.locationUnavailable`.
+        /// - Returns: The resolved `Location`.
+        ///
+        /// Notes:
+        /// - This API is single-flight: concurrent calls fail fast with `.alreadyInProgress`.
+        /// - On success or failure, any pending timeout task is cancelled.
         public func getCurrentLocation(timeout: TimeInterval? = nil, accuracyThresholdMeters: CLLocationAccuracy? = nil) async throws -> Location {
             // Read authorization directly from the underlying manager to avoid awaiting main actor
             let status = locationManager.authorizationStatus
