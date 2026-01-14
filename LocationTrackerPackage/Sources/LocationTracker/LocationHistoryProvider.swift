@@ -10,11 +10,11 @@ import Foundation
 @available(iOS 17.0, macOS 14.0, tvOS 17.0, watchOS 10.0, *)
 extension LocationTracker {
     /// An in-memory provider for storing and retrieving location history.
+    @MainActor
     public class LocationHistoryProvider {
         public static let shared = LocationHistoryProvider()
 
         private var history: [Location] = []
-        private let queue = DispatchQueue(label: "com.locationtracker.history.queue")
 
         // Retention controls (optional)
         private var _maxEntries: Int? = nil
@@ -26,8 +26,11 @@ extension LocationTracker {
         /// Trimming occurs after appends and also when reading history, ensuring the returned
         /// snapshot respects the current limit without requiring a manual cleanup call.
         public var maxEntries: Int? {
-            get { queue.sync { _maxEntries } }
-            set { queue.async { self._maxEntries = newValue; self.trimIfNeeded_locked(now: Date()) } }
+            get { _maxEntries }
+            set {
+                _maxEntries = newValue
+                trimIfNeeded(now: Date())
+            }
         }
 
         /// Maximum age (in seconds) to retain entries. Older entries are dropped.
@@ -36,8 +39,11 @@ extension LocationTracker {
         /// Age-based trimming uses each entry's `timestamp` and applies both after appends and on read.
         /// Combined with `maxEntries`, the final history contains only recent items within both limits.
         public var maxAge: TimeInterval? {
-            get { queue.sync { _maxAge } }
-            set { queue.async { self._maxAge = newValue; self.trimIfNeeded_locked(now: Date()) } }
+            get { _maxAge }
+            set {
+                _maxAge = newValue
+                trimIfNeeded(now: Date())
+            }
         }
 
         public init(maxEntries: Int? = nil, maxAge: TimeInterval? = nil) {
@@ -48,31 +54,25 @@ extension LocationTracker {
         /// Adds a new location to the history.
         /// - Parameter location: The `Location` to add.
         public func addLocation(_ location: Location) {
-            queue.async {
-                self.history.append(location)
-                self.trimIfNeeded_locked(now: Date())
-            }
+            history.append(location)
+            trimIfNeeded(now: Date())
         }
 
         /// Retrieves the entire location history.
         /// - Returns: An array of `Location` objects.
         public func getHistory() -> [Location] {
-            queue.sync {
-                // Apply age-based trimming at read time as well
-                self.trimIfNeeded_locked(now: Date())
-                return self.history
-            }
+            // Apply age-based trimming at read time as well
+            trimIfNeeded(now: Date())
+            return history
         }
 
         /// Clears all locations from the history.
         public func clearHistory() {
-            queue.async {
-                self.history.removeAll()
-            }
+            history.removeAll()
         }
 
         // MARK: - Trimming
-        private func trimIfNeeded_locked(now: Date) {
+        private func trimIfNeeded(now: Date) {
             // Age-based trimming
             if let maxAge = _maxAge {
                 let cutoff = now.addingTimeInterval(-maxAge)

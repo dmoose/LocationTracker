@@ -39,257 +39,217 @@ extension LocationTracker {
         }
     }
 
-    @Observable
-    public class LocationManager: NSObject, CLLocationManagerDelegate {
-        private let locationManager = CLLocationManager()
-        private let historyProvider: LocationHistoryProvider
+@MainActor
+@Observable
+public class LocationManager: NSObject, CLLocationManagerDelegate {
+    private let locationManager = CLLocationManager()
+    private let historyProvider: LocationHistoryProvider
 
-        @MainActor public private(set) var currentLocation: Location?
-        @MainActor public private(set) var authorizationStatus: CLAuthorizationStatus = .notDetermined
-        @MainActor public var authorization: LocationTracker.Authorization { .init(authorizationStatus) }
-        @MainActor public private(set) var lastError: LocationError?
+    public private(set) var currentLocation: Location?
+    public private(set) var authorizationStatus: CLAuthorizationStatus = .notDetermined
+    public var authorization: LocationTracker.Authorization { .init(authorizationStatus) }
+    public private(set) var lastError: LocationError?
 
-        private var locationContinuation: CheckedContinuation<Location, Error>?
-        private var pendingAccuracyThresholdMeters: CLLocationAccuracy?
-        private var pendingTimeoutTask: Task<Void, Never>?
-        private var isCurrentLocationRequestInProgress: Bool = false
-        private let continuationLock = NSLock()
+    private var locationContinuation: CheckedContinuation<Location, Error>?
+    private var pendingAccuracyThresholdMeters: CLLocationAccuracy?
+    private var pendingTimeoutTask: Task<Void, Never>?
+    private var isCurrentLocationRequestInProgress: Bool = false
 
-        public init(historyProvider: LocationHistoryProvider = .shared) {
-            self.historyProvider = historyProvider
-            super.init()
-            locationManager.delegate = self
-            // The initial value is .notDetermined, now fetch the real one.
-            Task { @MainActor in
-                self.authorizationStatus = CLLocationManager().authorizationStatus
-            }
+    public init(historyProvider: LocationHistoryProvider = .shared) {
+        self.historyProvider = historyProvider
+        super.init()
+        locationManager.delegate = self
+        // The initial value is .notDetermained, now fetch the real one.
+        self.authorizationStatus = CLLocationManager().authorizationStatus
+    }
+
+    public func requestPermission() {
+        guard locationManager.authorizationStatus == .notDetermined else { return }
+        locationManager.requestWhenInUseAuthorization()
+    }
+
+    public func startUpdatingLocation(accuracy: CLLocationAccuracy, distanceFilter: CLLocationDistance = kCLDistanceFilterNone, allowsBackgroundUpdates: Bool = false) {
+        locationManager.desiredAccuracy = accuracy
+        locationManager.distanceFilter = distanceFilter
+        locationManager.allowsBackgroundLocationUpdates = allowsBackgroundUpdates
+        locationManager.startUpdatingLocation()
+    }
+
+    public func stopUpdatingLocation() {
+        locationManager.stopUpdatingLocation()
+    }
+
+    // MARK: - Power/Behavior Configuration
+
+    /// The type of user activity associated with the location updates.
+    /// Helps the system optimize power and accuracy trade-offs.
+    /// The type of user activity associated with the location updates. Use this to hint the
+    /// system for better power/accuracy trade-offs (e.g., `.fitness`, `.automotiveNavigation`).
+    public var activityType: CLActivityType {
+        get { locationManager.activityType }
+        set { locationManager.activityType = newValue }
+    }
+
+    /// Whether the location manager may pause updates to save power.
+    /// iOS only.
+    #if os(iOS)
+    /// Whether the system may pause updates to save power when appropriate. Defaults to `true`.
+    public var pausesLocationUpdatesAutomatically: Bool {
+        get { locationManager.pausesLocationUpdatesAutomatically }
+        set { locationManager.pausesLocationUpdatesAutomatically = newValue }
+    }
+
+    /// Whether to show the blue background location indicator when updating in the background.
+    /// Whether to show the blue background location indicator when updating in the background.
+    /// Displaying this indicator can improve user trust when background updates are enabled.
+    public var showsBackgroundLocationIndicator: Bool {
+        get { locationManager.showsBackgroundLocationIndicator }
+        set { locationManager.showsBackgroundLocationIndicator = newValue }
+    }
+    #endif
+
+    public func enableBackgroundUpdates(_ allows: Bool) {
+        locationManager.allowsBackgroundLocationUpdates = allows
+    }
+
+    /// Start monitoring for significant changes in the user’s location.
+    /// This is a low-power alternative to continuous updates.
+    /// True while monitoring significant-change updates. Updated on the main actor.
+    public private(set) var isMonitoringSignificantChanges: Bool = false
+
+    public func startSignificantChangeUpdates() {
+        locationManager.startMonitoringSignificantLocationChanges()
+        isMonitoringSignificantChanges = true
+    }
+
+    /// Stop monitoring significant changes.
+    public func stopSignificantChangeUpdates() {
+        locationManager.stopMonitoringSignificantLocationChanges()
+        isMonitoringSignificantChanges = false
+    }
+
+    public func getHistory() -> [Location] {
+        historyProvider.getHistory()
+    }
+
+    public func clearHistory() {
+        historyProvider.clearHistory()
+    }
+
+    /// Returns a single current location result.
+    /// - Parameters:
+    ///   - timeout: Seconds to wait before failing with `LocationError.timeout`. Pass `nil` to wait indefinitely.
+    ///   - accuracyThresholdMeters: If provided, the result only resolves when the `horizontalAccuracy` of a fix is less-than-or-equal to this value. Fixes with negative accuracy are ignored. If `nil`, the first fix returned by Core Location is used.
+    /// - Throws: `LocationError.authorizationDenied`, `LocationError.authorizationRestricted`, `LocationError.alreadyInProgress`, `LocationError.timeout`, or `LocationError.locationUnavailable`.
+    /// - Returns: The resolved `Location`.
+    ///
+    /// Notes:
+    /// - This API is single-flight: concurrent calls fail fast with `.alreadyInProgress`.
+    /// - On success or failure, any pending timeout task is cancelled.
+    public func getCurrentLocation(timeout: TimeInterval? = nil, accuracyThresholdMeters: CLLocationAccuracy? = nil) async throws -> Location {
+        // Read authorization directly from the underlying manager to avoid awaiting main actor
+        let status = locationManager.authorizationStatus
+        if status == .denied || status == .restricted {
+            let error: LocationError = (status == .restricted) ? .authorizationRestricted : .authorizationDenied
+            self.lastError = error
+            throw error
         }
 
-        @MainActor
-        public func requestPermission() {
-            guard locationManager.authorizationStatus == .notDetermined else { return }
-            locationManager.requestWhenInUseAuthorization()
+        // Single-flight guard (atomic check-and-set) BEFORE any suspension
+        if isCurrentLocationRequestInProgress || locationContinuation != nil {
+            throw LocationError.alreadyInProgress
         }
+        isCurrentLocationRequestInProgress = true
 
-        public func startUpdatingLocation(accuracy: CLLocationAccuracy, distanceFilter: CLLocationDistance = kCLDistanceFilterNone, allowsBackgroundUpdates: Bool = false) {
-            locationManager.desiredAccuracy = accuracy
-            locationManager.distanceFilter = distanceFilter
-            locationManager.allowsBackgroundLocationUpdates = allowsBackgroundUpdates
-            locationManager.startUpdatingLocation()
-        }
-
-        public func stopUpdatingLocation() {
-            locationManager.stopUpdatingLocation()
-        }
-
-        // MARK: - Power/Behavior Configuration
-
-        /// The type of user activity associated with the location updates.
-        /// Helps the system optimize power and accuracy trade-offs.
-        /// The type of user activity associated with the location updates. Use this to hint the
-        /// system for better power/accuracy trade-offs (e.g., `.fitness`, `.automotiveNavigation`).
-        public var activityType: CLActivityType {
-            get { locationManager.activityType }
-            set { locationManager.activityType = newValue }
-        }
-
-        /// Whether the location manager may pause updates to save power.
-        /// iOS only.
-        #if os(iOS)
-        /// Whether the system may pause updates to save power when appropriate. Defaults to `true`.
-        public var pausesLocationUpdatesAutomatically: Bool {
-            get { locationManager.pausesLocationUpdatesAutomatically }
-            set { locationManager.pausesLocationUpdatesAutomatically = newValue }
-        }
-
-        /// Whether to show the blue background location indicator when updating in the background.
-        /// Whether to show the blue background location indicator when updating in the background.
-        /// Displaying this indicator can improve user trust when background updates are enabled.
-        public var showsBackgroundLocationIndicator: Bool {
-            get { locationManager.showsBackgroundLocationIndicator }
-            set { locationManager.showsBackgroundLocationIndicator = newValue }
-        }
-        #endif
-
-        public func enableBackgroundUpdates(_ allows: Bool) {
-            locationManager.allowsBackgroundLocationUpdates = allows
-        }
-
-        /// Start monitoring for significant changes in the user’s location.
-        /// This is a low-power alternative to continuous updates.
-        /// True while monitoring significant-change updates. Updated on the main actor.
-        @MainActor public private(set) var isMonitoringSignificantChanges: Bool = false
-
-        public func startSignificantChangeUpdates() {
-            locationManager.startMonitoringSignificantLocationChanges()
-            Task { @MainActor in self.isMonitoringSignificantChanges = true }
-        }
-
-        /// Stop monitoring significant changes.
-        public func stopSignificantChangeUpdates() {
-            locationManager.stopMonitoringSignificantLocationChanges()
-            Task { @MainActor in self.isMonitoringSignificantChanges = false }
-        }
-
-        @MainActor
-        public func getHistory() -> [Location] {
-            historyProvider.getHistory()
-        }
-
-        @MainActor
-        public func clearHistory() {
-            historyProvider.clearHistory()
-        }
-
-        /// Returns a single current location result.
-        /// - Parameters:
-        ///   - timeout: Seconds to wait before failing with `LocationError.timeout`. Pass `nil` to wait indefinitely.
-        ///   - accuracyThresholdMeters: If provided, the result only resolves when the `horizontalAccuracy` of a fix is less-than-or-equal to this value. Fixes with negative accuracy are ignored. If `nil`, the first fix returned by Core Location is used.
-        /// - Throws: `LocationError.authorizationDenied`, `LocationError.authorizationRestricted`, `LocationError.alreadyInProgress`, `LocationError.timeout`, or `LocationError.locationUnavailable`.
-        /// - Returns: The resolved `Location`.
-        ///
-        /// Notes:
-        /// - This API is single-flight: concurrent calls fail fast with `.alreadyInProgress`.
-        /// - On success or failure, any pending timeout task is cancelled.
-        public func getCurrentLocation(timeout: TimeInterval? = nil, accuracyThresholdMeters: CLLocationAccuracy? = nil) async throws -> Location {
-            // Read authorization directly from the underlying manager to avoid awaiting main actor
-            let status = locationManager.authorizationStatus
-            if status == .denied || status == .restricted {
-                let error: LocationError = (status == .restricted) ? .authorizationRestricted : .authorizationDenied
-                await MainActor.run { self.lastError = error }
-                throw error
-            }
-
-            // Single-flight guard (atomic check-and-set) BEFORE any suspension
-            var shouldThrow = false
-            continuationLock.withLock {
-                if self.isCurrentLocationRequestInProgress || self.locationContinuation != nil {
-                    shouldThrow = true
-                } else {
-                    self.isCurrentLocationRequestInProgress = true
-                }
-            }
-            if shouldThrow {
-                throw LocationError.alreadyInProgress
-            }
-
-            return try await withCheckedThrowingContinuation { continuation in
-                continuationLock.withLock {
-                    self.locationContinuation = continuation
-                    self.pendingAccuracyThresholdMeters = accuracyThresholdMeters
-                    // Cancel any previous timeout task (defensive)
-                    self.pendingTimeoutTask?.cancel()
-                    if let seconds = timeout, seconds > 0 {
-                        let nanos = UInt64(seconds * 1_000_000_000)
-                        self.pendingTimeoutTask = Task { [weak self] in
-                            try? await Task.sleep(nanoseconds: nanos)
-                            guard let self = self else { return }
-                            var contToResume: CheckedContinuation<Location, Error>? = nil
-                            self.continuationLock.withLock {
-                                if let cont = self.locationContinuation {
-                                    // Timeout still pending; capture and clear
-                                    contToResume = cont
-                                    self.locationContinuation = nil
-                                    self.pendingAccuracyThresholdMeters = nil
-                                    let _ = self.pendingTimeoutTask?.cancel()
-                                    self.pendingTimeoutTask = nil
-                                    self.isCurrentLocationRequestInProgress = false
-                                }
-                            }
-                            if let cont = contToResume {
-                                Task { @MainActor in self.lastError = .timeout }
-                                cont.resume(throwing: LocationError.timeout)
-                            }
-                        }
-                    } else {
-                        self.pendingTimeoutTask = nil
+        return try await withCheckedThrowingContinuation { continuation in
+            self.locationContinuation = continuation
+            self.pendingAccuracyThresholdMeters = accuracyThresholdMeters
+            // Cancel any previous timeout task (defensive)
+            self.pendingTimeoutTask?.cancel()
+            if let seconds = timeout, seconds > 0 {
+                let nanos = UInt64(seconds * 1_000_000_000)
+                self.pendingTimeoutTask = Task {
+                    try? await Task.sleep(nanoseconds: nanos)
+                    // If we are cancelled, the continuation will be nil.
+                    if let cont = self.locationContinuation {
+                        self.lastError = .timeout
+                        cont.resume(throwing: LocationError.timeout)
+                        self.resetContinuationState()
                     }
                 }
-                locationManager.requestLocation()
-            }
-        }
-
-        // MARK: - CLLocationManagerDelegate
-
-        nonisolated public func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
-            guard let clLocation = locations.last else { return }
-            let newLocation = Location(from: clLocation)
-
-            Task { @MainActor in
-                self.currentLocation = newLocation
-                self.historyProvider.addLocation(newLocation)
-                self.lastError = nil
-            }
-
-            var contToResume: CheckedContinuation<Location, Error>? = nil
-            continuationLock.withLock {
-                if let continuation = self.locationContinuation {
-                    // Check accuracy threshold if provided
-                    if let threshold = self.pendingAccuracyThresholdMeters {
-                        let acc = clLocation.horizontalAccuracy
-                        if acc < 0 || acc > threshold {
-                            // Not accurate enough yet; keep waiting
-                            return
-                        }
-                    }
-                    contToResume = continuation
-                    self.locationContinuation = nil
-                    self.pendingAccuracyThresholdMeters = nil
-                    let _ = self.pendingTimeoutTask?.cancel()
-                    self.pendingTimeoutTask = nil
-                    self.isCurrentLocationRequestInProgress = false
-                }
-            }
-            if let cont = contToResume {
-                cont.resume(returning: newLocation)
-            }
-        }
-
-        nonisolated public func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
-            let locationError: LocationError
-            if let clError = error as? CLError, clError.code == .denied {
-                locationError = .authorizationDenied
             } else {
-                locationError = .locationUnavailable
+                self.pendingTimeoutTask = nil
             }
-
-            Task { @MainActor in
-                self.lastError = locationError
-            }
-
-            var contToResume: CheckedContinuation<Location, Error>? = nil
-            continuationLock.withLock {
-                if let continuation = self.locationContinuation {
-                    contToResume = continuation
-                    self.locationContinuation = nil
-                    self.pendingAccuracyThresholdMeters = nil
-                    let _ = self.pendingTimeoutTask?.cancel()
-                    self.pendingTimeoutTask = nil
-                    self.isCurrentLocationRequestInProgress = false
-                }
-            }
-            if let cont = contToResume {
-                cont.resume(throwing: locationError)
-            }
+            locationManager.requestLocation()
         }
+    }
+    
+    private func resetContinuationState() {
+        locationContinuation = nil
+        pendingAccuracyThresholdMeters = nil
+        pendingTimeoutTask?.cancel()
+        pendingTimeoutTask = nil
+        isCurrentLocationRequestInProgress = false
+    }
 
-        nonisolated public func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
-            let newStatus = manager.authorizationStatus
-            Task { @MainActor in
-                self.authorizationStatus = newStatus
-                switch newStatus {
-                case .denied:
-                    self.lastError = .authorizationDenied
-                case .restricted:
-                    self.lastError = .authorizationRestricted
-                case .authorizedWhenInUse, .authorizedAlways:
-                    if self.lastError == .authorizationDenied || self.lastError == .authorizationRestricted {
-                        self.lastError = nil
+    // MARK: - CLLocationManagerDelegate
+
+    nonisolated public func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        guard let clLocation = locations.last else { return }
+        let newLocation = Location(from: clLocation)
+        let acc = clLocation.horizontalAccuracy
+        Task { @MainActor in
+            self.currentLocation = newLocation
+            self.historyProvider.addLocation(newLocation)
+            self.lastError = nil
+
+            if let continuation = self.locationContinuation {
+                // Check accuracy threshold if provided
+                if let threshold = self.pendingAccuracyThresholdMeters {
+                    if acc < 0 || acc > threshold {
+                        // Not accurate enough yet; keep waiting
+                        return
                     }
-                default:
-                    break
                 }
+                continuation.resume(returning: newLocation)
+                self.resetContinuationState()
             }
         }
+    }
+
+    nonisolated public func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+        let locationError: LocationError
+        if let clError = error as? CLError, clError.code == .denied {
+            locationError = .authorizationDenied
+        } else {
+            locationError = .locationUnavailable
+        }
+        Task { @MainActor in
+            self.lastError = locationError
+            if let continuation = self.locationContinuation {
+                continuation.resume(throwing: locationError)
+                self.resetContinuationState()
+            }
+        }
+    }
+
+    nonisolated public func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
+        let newStatus = manager.authorizationStatus
+        Task { @MainActor in
+            self.authorizationStatus = newStatus
+            switch newStatus {
+            case .denied:
+                self.lastError = .authorizationDenied
+            case .restricted:
+                self.lastError = .authorizationRestricted
+            case .authorizedWhenInUse, .authorizedAlways:
+                if self.lastError == .authorizationDenied || self.lastError == .authorizationRestricted {
+                    self.lastError = nil
+                }
+            default:
+                break
+            }
+        }
+    }
     }
 }

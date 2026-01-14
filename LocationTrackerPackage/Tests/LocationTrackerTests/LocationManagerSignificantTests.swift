@@ -10,17 +10,17 @@ import XCTest
 
 final class LocationManagerSignificantTests: XCTestCase {
     func testSignificantChangeStateToggles() async {
-        let manager = LocationTracker.LocationManager()
+        let manager = await LocationTracker.LocationManager()
         await MainActor.run {
             XCTAssertFalse(manager.isMonitoringSignificantChanges)
         }
 
-        manager.startSignificantChangeUpdates()
+        await manager.startSignificantChangeUpdates()
         await MainActor.run {
             XCTAssertTrue(manager.isMonitoringSignificantChanges)
         }
 
-        manager.stopSignificantChangeUpdates()
+        await manager.stopSignificantChangeUpdates()
         await MainActor.run {
             XCTAssertFalse(manager.isMonitoringSignificantChanges)
         }

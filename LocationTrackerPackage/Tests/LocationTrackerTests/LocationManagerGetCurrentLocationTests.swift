@@ -11,7 +11,7 @@ import CoreLocation
 
 final class LocationManagerGetCurrentLocationTests: XCTestCase {
     func testSingleFlightGuardsSecondCall() async {
-        let manager = LocationTracker.LocationManager()
+        let manager = await LocationTracker.LocationManager()
 
         print("[diag] starting first request at", Date())
         // Start a request without completing it; use a short timeout to speed up the test
@@ -76,7 +76,7 @@ final class LocationManagerGetCurrentLocationTests: XCTestCase {
     }
 
     func testTimeoutFiresWhenNoUpdateArrives() async {
-        let manager = LocationTracker.LocationManager()
+        let manager = await LocationTracker.LocationManager()
         do {
             _ = try await manager.getCurrentLocation(timeout: 0.05)
             XCTFail("Expected timeout error")
@@ -92,7 +92,7 @@ final class LocationManagerGetCurrentLocationTests: XCTestCase {
     }
 
     func testAccuracyThresholdDelaysUntilGoodFix() async {
-        let manager = LocationTracker.LocationManager()
+        let manager = await LocationTracker.LocationManager()
 
         let resultTask = Task { () -> LocationTracker.Location in
             try await manager.getCurrentLocation(timeout: 1.0, accuracyThresholdMeters: 10)

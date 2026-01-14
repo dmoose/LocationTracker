@@ -9,7 +9,7 @@ import XCTest
 @testable import LocationTracker
 
 final class HistoryProviderTests: XCTestCase {
-    func testAddGetClearHistory() {
+    @MainActor func testAddGetClearHistory() {
         let provider = LocationTracker.LocationHistoryProvider()
         XCTAssertTrue(provider.getHistory().isEmpty)
 
@@ -34,25 +34,14 @@ final class HistoryProviderTests: XCTestCase {
         XCTAssertTrue(provider.getHistory().isEmpty)
     }
 
-    func testConcurrentAddsEventuallyAppear() {
+    @MainActor func testConcurrentAddsEventuallyAppear() {
         let provider = LocationTracker.LocationHistoryProvider()
         provider.clearHistory()
 
-        let group = DispatchGroup()
         for i in 0..<20 {
-            group.enter()
-            DispatchQueue.global().async {
-                let loc = LocationTracker.Location(latitude: Double(i), longitude: Double(i), timestamp: Date())
-                provider.addLocation(loc)
-                group.leave()
-            }
+            let loc = LocationTracker.Location(latitude: Double(i), longitude: Double(i), timestamp: Date())
+            provider.addLocation(loc)
         }
-        group.wait()
-
-        // Allow async queue to flush
-        let exp = expectation(description: "history flushed")
-        DispatchQueue.global().asyncAfter(deadline: .now() + 0.1) { exp.fulfill() }
-        wait(for: [exp], timeout: 1.0)
 
         XCTAssertEqual(provider.getHistory().count, 20)
     }

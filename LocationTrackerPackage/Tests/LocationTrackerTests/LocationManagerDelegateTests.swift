@@ -11,7 +11,7 @@ import CoreLocation
 
 final class LocationManagerDelegateTests: XCTestCase {
     func testDidUpdateLocationsSetsStateAndHistory() async {
-        let manager = LocationTracker.LocationManager()
+        let manager = await LocationTracker.LocationManager()
         let cl = CLLocation(latitude: 10.0, longitude: 20.0)
 
         // Simulate delegate callback
@@ -28,7 +28,7 @@ final class LocationManagerDelegateTests: XCTestCase {
     }
 
     func testDidFailWithErrorDeniedSetsAuthorizationDenied() async {
-        let manager = LocationTracker.LocationManager()
+        let manager = await LocationTracker.LocationManager()
         let err = CLError(.denied)
         manager.locationManager(CLLocationManager(), didFailWithError: err)
 
@@ -38,7 +38,7 @@ final class LocationManagerDelegateTests: XCTestCase {
     }
 
     func testDidFailWithErrorGenericSetsLocationUnavailable() async {
-        let manager = LocationTracker.LocationManager()
+        let manager = await LocationTracker.LocationManager()
         // Use a non-denied error, e.g., network
         let err = CLError(.network)
         manager.locationManager(CLLocationManager(), didFailWithError: err)

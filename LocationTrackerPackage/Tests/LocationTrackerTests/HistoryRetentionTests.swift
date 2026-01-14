@@ -9,7 +9,7 @@ import XCTest
 @testable import LocationTracker
 
 final class HistoryRetentionTests: XCTestCase {
-    func testMaxEntriesTrimmingKeepsMostRecent() {
+    @MainActor func testMaxEntriesTrimmingKeepsMostRecent() {
         let provider = LocationTracker.LocationHistoryProvider()
         provider.maxEntries = 3
 
@@ -31,7 +31,7 @@ final class HistoryRetentionTests: XCTestCase {
         XCTAssertEqual(hist[2].latitude, 4)
     }
 
-    func testMaxAgeTrimmingDropsOldEntries() {
+    @MainActor func testMaxAgeTrimmingDropsOldEntries() {
         let provider = LocationTracker.LocationHistoryProvider()
         provider.maxAge = 0.5 // 0.5s
 

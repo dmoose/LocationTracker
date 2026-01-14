@@ -11,7 +11,7 @@ import CoreLocation
 @available(iOS 17.0, macOS 14.0, tvOS 17.0, watchOS 10.0, *)
 extension LocationTracker {
     /// A simple data structure to represent a geographical location.
-    public struct Location: Codable, Equatable, Identifiable {
+    public struct Location: Codable, Equatable, Identifiable, Sendable {
         public let id: UUID
         public let latitude: Double
         public let longitude: Double
