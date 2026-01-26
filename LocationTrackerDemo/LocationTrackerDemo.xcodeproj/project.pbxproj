@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		1F781A372E0A0A3400AEFC98 /* LocationTracker in Frameworks */ = {isa = PBXBuildFile; productRef = 1F781A362E0A0A3400AEFC98 /* LocationTracker */; };
+		1FEA05DC2E79D6EF009E90A6 /* UtilityDesignSystem in Frameworks */ = {isa = PBXBuildFile; productRef = 1FEA05DB2E79D6EF009E90A6 /* UtilityDesignSystem */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -56,6 +57,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				1FEA05DC2E79D6EF009E90A6 /* UtilityDesignSystem in Frameworks */,
 				1F781A372E0A0A3400AEFC98 /* LocationTracker in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -126,6 +128,7 @@
 			name = LocationTrackerDemo;
 			packageProductDependencies = (
 				1F781A362E0A0A3400AEFC98 /* LocationTracker */,
+				1FEA05DB2E79D6EF009E90A6 /* UtilityDesignSystem */,
 			);
 			productName = LocationTrackerDemo;
 			productReference = 1F7819FA2E0A052500AEFC98 /* LocationTrackerDemo.app */;
@@ -211,6 +214,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				1F781A342E0A078D00AEFC98 /* XCLocalSwiftPackageReference "../LocationTrackerPackage" */,
+				1FEA05DA2E79D6EF009E90A6 /* XCLocalSwiftPackageReference "../../UtilityDesignSystem/UtilityDesignSystemPackage" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 1F7819FB2E0A052500AEFC98 /* Products */;
@@ -618,6 +622,10 @@
 			isa = XCLocalSwiftPackageReference;
 			relativePath = ../LocationTrackerPackage;
 		};
+		1FEA05DA2E79D6EF009E90A6 /* XCLocalSwiftPackageReference "../../UtilityDesignSystem/UtilityDesignSystemPackage" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../../UtilityDesignSystem/UtilityDesignSystemPackage;
+		};
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -625,6 +633,10 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 1F781A342E0A078D00AEFC98 /* XCLocalSwiftPackageReference "../LocationTrackerPackage" */;
 			productName = LocationTracker;
+		};
+		1FEA05DB2E79D6EF009E90A6 /* UtilityDesignSystem */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = UtilityDesignSystem;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

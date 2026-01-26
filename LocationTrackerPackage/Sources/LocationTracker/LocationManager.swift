@@ -8,6 +8,7 @@
 import Foundation
 import CoreLocation
 import Observation
+import DefaultLogger
 
 @available(iOS 17.0, macOS 14.0, tvOS 17.0, watchOS 10.0, *)
 extension LocationTracker {
@@ -65,6 +66,8 @@ public class LocationManager: NSObject, CLLocationManagerDelegate {
 
     public func requestPermission() {
         guard locationManager.authorizationStatus == .notDetermined else { return }
+        let logger = Resolver.getLogger()
+        Task { await logger.log("Requesting location permission", level: .info, category: "LocationTracker.Permission") }
         locationManager.requestWhenInUseAuthorization()
     }
 
@@ -72,10 +75,14 @@ public class LocationManager: NSObject, CLLocationManagerDelegate {
         locationManager.desiredAccuracy = accuracy
         locationManager.distanceFilter = distanceFilter
         locationManager.allowsBackgroundLocationUpdates = allowsBackgroundUpdates
+        let logger = Resolver.getLogger()
+        Task { await logger.log("Start updates accuracy=\(accuracy) distanceFilter=\(distanceFilter) bg=\(allowsBackgroundUpdates)", level: .info, category: "LocationTracker.Updates") }
         locationManager.startUpdatingLocation()
     }
 
     public func stopUpdatingLocation() {
+        let logger = Resolver.getLogger()
+        Task { await logger.log("Stop updates", level: .info, category: "LocationTracker.Updates") }
         locationManager.stopUpdatingLocation()
     }
 
@@ -87,7 +94,11 @@ public class LocationManager: NSObject, CLLocationManagerDelegate {
     /// system for better power/accuracy trade-offs (e.g., `.fitness`, `.automotiveNavigation`).
     public var activityType: CLActivityType {
         get { locationManager.activityType }
-        set { locationManager.activityType = newValue }
+        set {
+            locationManager.activityType = newValue
+            let logger = Resolver.getLogger()
+            Task { await logger.log("Set activityType=\(String(describing: newValue))", level: .debug, category: "LocationTracker.Power") }
+        }
     }
 
     /// Whether the location manager may pause updates to save power.
@@ -96,7 +107,11 @@ public class LocationManager: NSObject, CLLocationManagerDelegate {
     /// Whether the system may pause updates to save power when appropriate. Defaults to `true`.
     public var pausesLocationUpdatesAutomatically: Bool {
         get { locationManager.pausesLocationUpdatesAutomatically }
-        set { locationManager.pausesLocationUpdatesAutomatically = newValue }
+        set {
+            locationManager.pausesLocationUpdatesAutomatically = newValue
+            let logger = Resolver.getLogger()
+            Task { await logger.log("Set pausesAutomatically=\(newValue)", level: .debug, category: "LocationTracker.Power") }
+        }
     }
 
     /// Whether to show the blue background location indicator when updating in the background.
@@ -104,12 +119,18 @@ public class LocationManager: NSObject, CLLocationManagerDelegate {
     /// Displaying this indicator can improve user trust when background updates are enabled.
     public var showsBackgroundLocationIndicator: Bool {
         get { locationManager.showsBackgroundLocationIndicator }
-        set { locationManager.showsBackgroundLocationIndicator = newValue }
+        set {
+            locationManager.showsBackgroundLocationIndicator = newValue
+            let logger = Resolver.getLogger()
+            Task { await logger.log("Set showsBackgroundIndicator=\(newValue)", level: .debug, category: "LocationTracker.Power") }
+        }
     }
     #endif
 
     public func enableBackgroundUpdates(_ allows: Bool) {
         locationManager.allowsBackgroundLocationUpdates = allows
+        let logger = Resolver.getLogger()
+        Task { await logger.log("Background updates set to \(allows)", level: .info, category: "LocationTracker.Power") }
     }
 
     /// Start monitoring for significant changes in the user’s location.
@@ -118,12 +139,16 @@ public class LocationManager: NSObject, CLLocationManagerDelegate {
     public private(set) var isMonitoringSignificantChanges: Bool = false
 
     public func startSignificantChangeUpdates() {
+        let logger = Resolver.getLogger()
+        Task { await logger.log("Start significant-change updates", level: .info, category: "LocationTracker.Significant") }
         locationManager.startMonitoringSignificantLocationChanges()
         isMonitoringSignificantChanges = true
     }
 
     /// Stop monitoring significant changes.
     public func stopSignificantChangeUpdates() {
+        let logger = Resolver.getLogger()
+        Task { await logger.log("Stop significant-change updates", level: .info, category: "LocationTracker.Significant") }
         locationManager.stopMonitoringSignificantLocationChanges()
         isMonitoringSignificantChanges = false
     }
@@ -152,14 +177,21 @@ public class LocationManager: NSObject, CLLocationManagerDelegate {
         if status == .denied || status == .restricted {
             let error: LocationError = (status == .restricted) ? .authorizationRestricted : .authorizationDenied
             self.lastError = error
+            let logger = Resolver.getLogger()
+            Task { await logger.log("getCurrentLocation denied/restricted", level: .warning, category: "LocationTracker.Current") }
             throw error
         }
 
         // Single-flight guard (atomic check-and-set) BEFORE any suspension
         if isCurrentLocationRequestInProgress || locationContinuation != nil {
+            let logger = Resolver.getLogger()
+            Task { await logger.log("getCurrentLocation alreadyInProgress", level: .warning, category: "LocationTracker.Current") }
             throw LocationError.alreadyInProgress
         }
         isCurrentLocationRequestInProgress = true
+
+        let logger = Resolver.getLogger()
+        Task { await logger.log("getCurrentLocation start timeout=\(timeout ?? -1) threshold=\(accuracyThresholdMeters ?? -1)", level: .debug, category: "LocationTracker.Current") }
 
         return try await withCheckedThrowingContinuation { continuation in
             self.locationContinuation = continuation
@@ -173,6 +205,8 @@ public class LocationManager: NSObject, CLLocationManagerDelegate {
                     // If we are cancelled, the continuation will be nil.
                     if let cont = self.locationContinuation {
                         self.lastError = .timeout
+                        let logger = Resolver.getLogger()
+                        await logger.log("getCurrentLocation timeout seconds=\(seconds)", level: .warning, category: "LocationTracker.Current")
                         cont.resume(throwing: LocationError.timeout)
                         self.resetContinuationState()
                     }
@@ -207,10 +241,12 @@ public class LocationManager: NSObject, CLLocationManagerDelegate {
                 // Check accuracy threshold if provided
                 if let threshold = self.pendingAccuracyThresholdMeters {
                     if acc < 0 || acc > threshold {
-                        // Not accurate enough yet; keep waiting
+                        // Not accurate enough yet; keep waiting (no log to avoid noise)
                         return
                     }
                 }
+                let logger = Resolver.getLogger()
+                Task { await logger.log("getCurrentLocation success lat=\(String(format: "%.5f", newLocation.latitude)) lon=\(String(format: "%.5f", newLocation.longitude)) acc=\(String(format: "%.1f", acc))", level: .info, category: "LocationTracker.Current") }
                 continuation.resume(returning: newLocation)
                 self.resetContinuationState()
             }
@@ -219,12 +255,18 @@ public class LocationManager: NSObject, CLLocationManagerDelegate {
 
     nonisolated public func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
         let locationError: LocationError
+        var codeDesc: String = "unknown"
+        if let clError = error as? CLError {
+            codeDesc = String(describing: clError.code)
+        }
         if let clError = error as? CLError, clError.code == .denied {
             locationError = .authorizationDenied
         } else {
             locationError = .locationUnavailable
         }
         Task { @MainActor in
+            let logger = Resolver.getLogger()
+            await logger.log("CLLocationManager failed code=\(codeDesc) mapped=\(locationError)", level: .warning, category: "LocationTracker.Updates")
             self.lastError = locationError
             if let continuation = self.locationContinuation {
                 continuation.resume(throwing: locationError)
@@ -236,6 +278,8 @@ public class LocationManager: NSObject, CLLocationManagerDelegate {
     nonisolated public func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
         let newStatus = manager.authorizationStatus
         Task { @MainActor in
+            let logger = Resolver.getLogger()
+            await logger.log("Authorization changed to \(String(describing: newStatus))", level: .info, category: "LocationTracker.Permission")
             self.authorizationStatus = newStatus
             switch newStatus {
             case .denied:

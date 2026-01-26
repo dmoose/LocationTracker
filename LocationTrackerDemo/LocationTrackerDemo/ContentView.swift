@@ -71,6 +71,9 @@ struct ContentView: View {
                 VStack(spacing: 16) {
                     header
                     controls
+                    // Package-provided cards using UtilityDesignSystem
+                    LocationAuthorizationCardView()
+                    LocationStatusCardView()
                     status
                 }
                 .padding()
