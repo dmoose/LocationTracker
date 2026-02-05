@@ -1,5 +1,6 @@
 import SwiftUI
 import UtilityDesignSystem
+import DefaultLogger
 
 @available(iOS 17.0, macOS 14.0, tvOS 17.0, watchOS 10.0, *)
 public struct LocationAuthorizationCardView: View {
@@ -22,11 +23,46 @@ public struct LocationAuthorizationCardView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
 
+                    // Diagnose missing usage strings
+                    let usage = LocationTracker.PermissionDiagnostics.usageStringsPresence()
+                    if !usage.whenInUse {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Configuration issue: Missing NSLocationWhenInUseUsageDescription in Info.plist")
+                                .font(.caption)
+                                .foregroundStyle(.red)
+                            #if os(iOS)
+                            Button("Open Settings") {
+                                let logger = Resolver.getLogger()
+                                Task { @MainActor in
+                                    await logger.log("Opening Settings due to missing WhenInUse usage string", level: .warning, category: "LocationTracker.Permission")
+                                    LocationTracker.PermissionDiagnostics.openAppSettings()
+                                }
+                            }
+                            .buttonStyle(.bordered)
+                            #endif
+                        }
+                    }
+
                     if shouldShowRequestButton {
                         Button("Request Permission") {
-                            manager.requestPermission()
+                            let logger = Resolver.getLogger()
+                            Task { @MainActor in
+                                await logger.log("Request Permission tapped", level: .info, category: "LocationTracker.Permission")
+                                manager.requestPermission()
+                            }
                         }
                         .buttonStyle(.borderedProminent)
+                    } else if deniedOrRestricted {
+                        #if os(iOS)
+                        Button("Open Settings") {
+                            let logger = Resolver.getLogger()
+                            Task { @MainActor in
+                                await logger.log("Open Settings tapped (denied/restricted)", level: .info, category: "LocationTracker.Permission")
+                                LocationTracker.PermissionDiagnostics.openAppSettings()
+                            }
+                        }
+                        .buttonStyle(.bordered)
+                        #endif
                     }
                 }
             }
@@ -69,5 +105,9 @@ public struct LocationAuthorizationCardView: View {
 
     private var shouldShowRequestButton: Bool {
         manager.authorization == .notDetermined
+    }
+
+    private var deniedOrRestricted: Bool {
+        manager.authorization == .denied || manager.authorization == .restricted
     }
 }
