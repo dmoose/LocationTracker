@@ -111,9 +111,31 @@ A full-featured SwiftUI demo app is included in the adjacent `LocationTrackerDem
 
 A simple command-line demo is also available in the `/Examples/ConsoleDemo` directory.
 
+## Permission Diagnostics
+
+The package includes utilities to help diagnose permission issues at runtime:
+
+```swift
+// Check if required Info.plist keys are present
+let presence = LocationTracker.PermissionDiagnostics.usageStringsPresence()
+if !presence.whenInUse {
+    print("Missing NSLocationWhenInUseUsageDescription")
+}
+
+// Check if location services are enabled system-wide
+if !LocationTracker.PermissionDiagnostics.servicesEnabled() {
+    print("Location services disabled in Settings")
+}
+
+// iOS only: open app's Settings page
+#if os(iOS)
+LocationTracker.PermissionDiagnostics.openAppSettings()
+#endif
+```
+
 ## Building and Testing
 
-The package requires Swift 5.9+ and supports iOS 17+, macOS 14+, tvOS 17+, and watchOS 10+.
+The package requires Swift 6.2 and supports iOS 17+, macOS 14+, and watchOS 10+.
 
 ```bash
 # Build the package
