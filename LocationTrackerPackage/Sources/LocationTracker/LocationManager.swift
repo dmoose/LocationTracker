@@ -43,6 +43,8 @@ extension LocationTracker {
 @MainActor
 @Observable
 public class LocationManager: NSObject, CLLocationManagerDelegate {
+    public static let shared = LocationManager()
+
     private let locationManager = CLLocationManager()
     private let historyProvider: LocationHistoryProvider
 

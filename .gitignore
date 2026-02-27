@@ -1,3 +1,5 @@
+# CatLogger/.gitignore
+
 # macOS
 .DS_Store
 .AppleDouble
@@ -7,15 +9,20 @@ Icon?
 .Spotlight-V100
 .Trashes
 
-# Swift & Xcode Build Artifacts
+# Swift Package Manager Build Artifacts
 .build/
-Packages/
-DerivedData/
 .swiftpm/
+Package.resolved
+Packages/
+
+# Xcode Build Artifacts
+DerivedData/
+build/
 xcuserdata/
 *.xcuserdatad/
 *.xcscmblueprint
 *.xccheckout
+*.xcworkspace/xcuserdata/
 
 # IDEs
 .vscode/
@@ -32,12 +39,5 @@ xcuserdata/
 *.pem
 *.key
 
-# Swift Package Manager
-Package.resolved
-.swiftpm/configuration/registries.json
-.swiftpm/xcode/package.xcworkspace/contents.xcworkspacedata
-.netrc
-
-# Exclude documentation build artifacts
-/LocationTrackerPackage/docs/
-/docs/
+# Documentation build artifacts
+docs/
