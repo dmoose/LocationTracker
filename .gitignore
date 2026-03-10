@@ -39,5 +39,6 @@ xcuserdata/
 *.pem
 *.key
 
-# Documentation build artifacts
+# Documentation build artifacts (swift-docc output)
+# NOTE: Track 2 reference docs live in Documentation/ — do not ignore that.
 docs/
